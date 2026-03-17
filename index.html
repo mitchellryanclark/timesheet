@@ -4,34 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rush Timesheet</title>
-    
     <link rel="manifest" href="manifest.json">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#28a745">
-
     <style>
         #notification-bar {
-            position: fixed;
-            top: -100px;
-            left: 0;
-            width: 100%;
-            background-color: #28a745;
-            color: white;
-            text-align: center;
-            padding: 15px;
-            font-weight: bold;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
-            transition: top 0.5s ease-in-out;
-            z-index: 1000;
+            position: fixed; top: -100px; left: 0; width: 100%;
+            background-color: #28a745; color: white; text-align: center;
+            padding: 15px; font-weight: bold; transition: top 0.5s; z-index: 1000;
         }
+        .time-box { background: #e9ecef; padding: 10px; border-radius: 5px; margin-top: 10px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body style="font-family: sans-serif; margin: 20px; max-width: 450px;">
 
     <div id="notification-bar">Verification: Time Logged!</div>
-
     <h2>Rush Timesheet Tracker</h2>
 
     <button id="mic-btn" style="padding: 15px; width: 100%; background-color: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; cursor: pointer;">
@@ -44,13 +30,16 @@
     <div style="display: flex; gap: 10px;">
         <div style="flex: 1;">
             <label>Start Time:</label><br>
-            <input type="time" id="start-time" style="width: 100%; padding: 8px; margin-top: 5px;">
+            <input type="time" id="start-time" class="time-input" style="width: 100%; padding: 8px; margin-top: 5px;">
         </div>
         <div style="flex: 1;">
             <label>End Time:</label><br>
-            <input type="time" id="end-time" style="width: 100%; padding: 8px; margin-top: 5px;">
+            <input type="time" id="end-time" class="time-input" style="width: 100%; padding: 8px; margin-top: 5px;">
         </div>
-    </div><br>
+    </div>
+
+    <div id="auto-calc-display" class="time-box">Total: 0.00 hours</div>
+    <br>
 
     <label>Pay Type:</label><br>
     <select id="pay-type" style="width: 100%; padding: 8px; margin-top: 5px;">
@@ -62,95 +51,97 @@
 
     <button id="add-btn" style="padding: 12px; font-weight: bold; background-color: #007bff; color: white; border: none; border-radius: 6px; width: 100%; cursor: pointer;">Log Hours Locally</button>
 
-    <h3>Logged Hours:</h3>
-    <div id="log-display" style="background: #f0f0f0; padding: 15px; min-height: 100px; border-radius: 8px; line-height: 1.6;"></div>
+    <h3>History:</h3>
+    <div id="log-display" style="background: #f0f0f0; padding: 15px; border-radius: 8px; line-height: 1.6;"></div>
 
     <script>
-        function showNotification(message) {
+        const notification = (msg) => {
             const bar = document.getElementById('notification-bar');
-            bar.innerText = message;
-            bar.style.top = "0";
-            setTimeout(() => { bar.style.top = "-100px"; }, 5000);
+            bar.innerText = msg; bar.style.top = "0";
+            setTimeout(() => bar.style.top = "-100px", 4000);
+        };
+
+        function format12h(t) {
+            if(!t) return "";
+            let [h, m] = t.split(':');
+            let ampm = h >= 12 ? 'PM' : 'AM';
+            return (h % 12 || 12) + ":" + m + " " + ampm;
         }
 
-        function formatTime12h(timeStr) {
-            if (!timeStr) return "N/A";
-            let [hours, minutes] = timeStr.split(':');
-            let ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            return hours + ":" + minutes + " " + ampm;
+        function updateLiveCalc() {
+            const s = document.getElementById('start-time').value;
+            const e = document.getElementById('end-time').value;
+            if (s && e) {
+                let start = s.split(':'), end = e.split(':');
+                let diff = ((parseInt(end[0])*60)+parseInt(end[1])) - ((parseInt(start[0])*60)+parseInt(start[1]));
+                if (diff < 0) diff += 1440;
+                document.getElementById('auto-calc-display').innerHTML = `Total: <strong>${(diff/60).toFixed(2)}</strong> hours`;
+            }
         }
 
-        function formatDate(dateStr) {
-            if (!dateStr) return "";
-            const [year, month, day] = dateStr.split('-');
-            return month + "/" + day + "/" + year;
+        // Listen for manual changes to auto-update calc
+        document.querySelectorAll('.time-input').forEach(input => {
+            input.addEventListener('input', updateLiveCalc);
+        });
+
+        function parseVoiceTime(text) {
+            const match = text.match(/(\d{1,2})[:\s]?(\d{2})?/);
+            if (!match) return null;
+            let h = parseInt(match[1]);
+            let m = match[2] ? parseInt(match[2]) : 0;
+            // Simple logic: if hour is 1-7, assume PM for workdays
+            if (h >= 1 && h <= 7 && !text.includes("am")) h += 12;
+            return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
         }
 
-        function getRoundedTime() {
-            const now = new Date();
-            let hours = now.getHours();
-            let minutes = Math.round(now.getMinutes() / 5) * 5;
-            if (minutes === 60) { minutes = 0; hours = (hours + 1) % 24; }
-            return hours.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0');
-        }
-
-        function calculateHours(startTime, endTime) {
-            if (!startTime || !endTime) return "0.00";
-            let start = startTime.split(':');
-            let end = endTime.split(':');
-            let startMins = (parseInt(start[0]) * 60) + parseInt(start[1]);
-            let endMins = (parseInt(end[0]) * 60) + parseInt(end[1]);
-            let diff = endMins - startMins;
-            if (diff < 0) diff += 24 * 60; 
-            return (diff / 60).toFixed(2);
-        }
-
-        const micBtn = document.getElementById('mic-btn');
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
-            micBtn.addEventListener('click', () => {
-                recognition.start();
-                micBtn.innerText = "Listening...";
-                micBtn.style.backgroundColor = "#dc3545";
-            });
-
-            recognition.onresult = function(event) {
-                const transcript = event.results[0][0].transcript.toLowerCase();
-                micBtn.innerText = "🎤 Tap to Speak";
-                micBtn.style.backgroundColor = "#28a745";
+            document.getElementById('mic-btn').onclick = () => { recognition.start(); };
+            
+            recognition.onresult = (event) => {
+                const speech = event.results[0][0].transcript.toLowerCase();
                 document.getElementById('date').valueAsDate = new Date();
+                
+                // ADJUSTMENT LOGIC
+                if (speech.includes("started at") || speech.includes("start time to") || speech.includes("clock in")) {
+                    const time = speech.includes("at") || speech.includes("to") ? parseVoiceTime(speech) : null;
+                    const finalTime = time || ( () => {
+                        const now = new Date();
+                        let m = Math.round(now.getMinutes() / 5) * 5;
+                        let h = now.getHours();
+                        if(m===60) { m=0; h++; }
+                        return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
+                    })();
+                    document.getElementById('start-time').value = finalTime;
+                    notification("✅ Start: " + format12h(finalTime));
+                }
 
-                if (transcript.includes("got to work") || transcript.includes("started") || transcript.includes("clock in")) {
-                    const t = getRoundedTime();
-                    document.getElementById('start-time').value = t;
-                    showNotification("✅ Start Time set to " + formatTime12h(t));
+                if (speech.includes("left at") || speech.includes("end time to") || speech.includes("clock out")) {
+                    const time = speech.includes("at") || speech.includes("to") ? parseVoiceTime(speech) : null;
+                    const finalTime = time || ( () => {
+                        const now = new Date();
+                        let m = Math.round(now.getMinutes() / 5) * 5;
+                        let h = now.getHours();
+                        if(m===60) { m=0; h++; }
+                        return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
+                    })();
+                    document.getElementById('end-time').value = finalTime;
+                    notification("✅ End: " + format12h(finalTime));
                 }
-                if (transcript.includes("left work") || transcript.includes("finished") || transcript.includes("clock out")) {
-                    const t = getRoundedTime();
-                    document.getElementById('end-time').value = t;
-                    showNotification("✅ End Time set to " + formatTime12h(t));
-                }
+                updateLiveCalc();
             };
         }
 
-        document.getElementById("add-btn").addEventListener("click", function() {
+        document.getElementById("add-btn").onclick = () => {
             const d = document.getElementById("date").value;
             const s = document.getElementById("start-time").value;
             const e = document.getElementById("end-time").value;
-            const p = document.getElementById("pay-type").value;
-            if (!d) return alert("Please select a date.");
-            const total = calculateHours(s, e);
-            const row = `<div>📅 ${formatDate(d)} | 🕒 ${formatTime12h(s)} - ${formatTime12h(e)} | 💰 <strong>${total} hrs</strong></div>`;
+            if (!d || !s || !e) return alert("Missing data!");
+            const row = `<div>📅 ${d} | 🕒 ${format12h(s)} - ${format12h(e)}</div>`;
             document.getElementById("log-display").innerHTML += row;
-            showNotification("💾 Hours Logged Locally!");
-        });
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('data:text/javascript,self.addEventListener("fetch", (e) => {});');
-        }
+            notification("💾 Saved to History");
+        };
     </script>
 </body>
 </html>
