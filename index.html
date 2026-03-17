@@ -208,7 +208,7 @@
                         monthName: monthName
                     })
                 });
-                // Note: With no-cors, we can't read the exact server response, but if it doesn't throw a network error, it went through.
+                // Note: With no-cors, I can't read the exact server response, but if it doesn't throw a network error, it went through.
                 setTimeout(() => notification("✅ PDF Saved to your Google Drive Folder!", "#28a745"), 1500);
             } catch (err) {
                 notification("⚠️ Network error. Could not authorize.", "#dc3545");
@@ -255,14 +255,8 @@
             renderCalendar();
         }
 
-        // Auto-select today on first load
-        if (!document.getElementById('date').value) {
-            const today = new Date();
-            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-            selectCalendarDate(todayStr);
-        } else {
-            renderCalendar();
-        }
+        // Render calendar on first load without selecting a date
+        renderCalendar();
     </script>
 </body>
 </html>
