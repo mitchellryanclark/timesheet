@@ -41,7 +41,18 @@
     <div id="auto-calc-display" class="time-box">Total: 0.00 hours</div>
     <br>
 
-    <button id="add-btn" style="padding: 12px; font-weight: bold; background-color: #007bff; color: white; border: none; border-radius: 6px; width: 100%; cursor: pointer;">Log Hours Locally</button>
+    <label>Pay Type:</label><br>
+    <select id="pay-type" style="width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 15px;">
+        <option value="Regular">Regular</option>
+        <option value="Vacay Pay">Vacay Pay</option>
+        <option value="Holiday Pay">Holiday Pay</option>
+        <option value="Sick Day">Sick Day</option>
+    </select><br>
+
+    <button id="add-btn" style="padding: 12px; font-weight: bold; background-color: #007bff; color: white; border: none; border-radius: 6px; width: 100%; cursor: pointer; margin-bottom: 20px;">Log Hours Locally</button>
+
+    <h3>History:</h3>
+    <div id="log-display" style="background: #f0f0f0; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;"></div>
 
     <script>
         const notification = (msg) => {
@@ -67,11 +78,73 @@
                 let diff = endMins - startMins;
                 if (diff < 0) diff += 1440;
                 document.getElementById('auto-calc-display').innerHTML = `Total: <strong>${(diff/60).toFixed(2)}</strong> hours`;
+            } else {
+                document.getElementById('auto-calc-display').innerHTML = `Total: 0.00 hours`;
             }
         }
 
         document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
 
+        // Render History Logic
+        function renderHistory() {
+            let history = JSON.parse(localStorage.getItem('rushTimesheet')) || {};
+            let display = document.getElementById("log-display");
+            display.innerHTML = "";
+
+            let dates = Object.keys(history).sort((a, b) => new Date(b) - new Date(a));
+
+            dates.forEach(d => {
+                let entry = history[d];
+                let startStr = entry.start ? format12h(entry.start) : "Pending...";
+                let endStr = entry.end ? format12h(entry.end) : "Pending...";
+                
+                let totalStr = "";
+                if (entry.start && entry.end) {
+                    let [sh, sm] = entry.start.split(':').map(Number);
+                    let [eh, em] = entry.end.split(':').map(Number);
+                    let diff = (eh * 60 + em) - (sh * 60 + sm);
+                    if (diff < 0) diff += 1440;
+                    totalStr = ` | <strong>${(diff/60).toFixed(2)} hrs</strong>`;
+                }
+
+                display.innerHTML += `<div style="background: #fff; padding: 12px; margin-bottom: 10px; border-radius: 5px; border-left: 5px solid #28a745; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 5px; display: flex; justify-content: space-between;">
+                        <strong>📅 ${d}</strong> 
+                        <span style="color: #666; font-size: 0.9em;">${entry.type}</span>
+                    </div>
+                    <div>🕒 ${startStr} - ${endStr} ${totalStr}</div>
+                </div>`;
+            });
+        }
+
+        // Save Button Logic
+        document.getElementById("add-btn").onclick = () => {
+            const d = document.getElementById("date").value;
+            const s = document.getElementById("start-time").value;
+            const e = document.getElementById("end-time").value;
+            const pt = document.getElementById("pay-type").value;
+
+            if (!d) return alert("A Date is required to save an entry.");
+
+            let history = JSON.parse(localStorage.getItem('rushTimesheet')) || {};
+            let existing = history[d] || { start: "", end: "", type: "Regular" };
+
+            // Only overwrite if the input box has data, otherwise keep existing
+            if (s) existing.start = s;
+            if (e) existing.end = e;
+            if (pt) existing.type = pt;
+
+            history[d] = existing;
+            localStorage.setItem('rushTimesheet', JSON.stringify(history));
+
+            notification("💾 Saved to History");
+            renderHistory();
+        };
+
+        // Load history on startup
+        renderHistory();
+
+        // Voice Parsing Logic
         function parseVoiceTime(text, isRange = false) {
             const numMap = {"one":"1","two":"2","three":"3","four":"4","five":"5","six":"6","seven":"7","eight":"8","nine":"9","ten":"10","eleven":"11","twelve":"12"};
             for(let w in numMap) {
@@ -118,7 +191,6 @@
             return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
         }
 
-        // Duration logic for Chronology Checker
         function optimizeShift(anchorTime, newTime, isSettingStart) {
             let [ah, am] = anchorTime.split(':').map(Number);
             let [nh, nm] = newTime.split(':').map(Number);
@@ -153,7 +225,6 @@
                 const dateField = document.getElementById('date');
                 const hasExplicitAMPM = /am|a\.m\.|pm|p\.m\.|morning|night|evening|afternoon/.test(speech);
 
-                // A. Parse Date & Explicit Months & Weekdays
                 let targetDate = new Date();
                 let dateFound = false;
 
@@ -175,9 +246,8 @@
                         let todayDay = targetDate.getDay();
                         
                         let daysAgo = todayDay - spokenDay;
-                        if (daysAgo <= 0) daysAgo += 7; // Get the most recent occurrence
+                        if (daysAgo <= 0) daysAgo += 7; 
 
-                        // If "Last" is spoken, only add 7 days if the most recent occurrence was THIS calendar week
                         if (isLast && daysAgo < todayDay) {
                             daysAgo += 7;
                         }
@@ -202,7 +272,6 @@
                    dateField.value = `${y}-${mo}-${d}`; 
                 }
 
-                // B. Parse Range or Single Time
                 let handledAsRange = false;
                 
                 if (!speech.includes("change")) {
