@@ -72,15 +72,13 @@
 
         document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
 
-        function parseVoiceTime(text) {
-            // Check for explicit Noon / Midnight
+        function parseVoiceTime(text, isRange = false) {
             if (/\bnoon\b/.test(text)) return "12:00";
             if (/\bmidnight\b/.test(text)) return "00:00";
 
             let isAM = /am|a\.m\.|morning/.test(text);
             let isPM = /pm|p\.m\.|evening|night|tonight|afternoon/.test(text);
 
-            // Scrub dates so they aren't read as hours
             let cleanText = text.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/g, '');
             cleanText = cleanText.replace(/\b\d{1,2}(st|nd|rd|th)\b/g, ''); 
             cleanText = cleanText.replace(/on the \d{1,2}/g, '');
@@ -97,7 +95,12 @@
             } else if (isPM) {
                 if (h < 12) h += 12;
             } else {
-                if (new Date().getHours() >= 12 && h < 12) h += 12; 
+                if (isRange) {
+                    // Daytime Shift Assumption: Numbers 1-5 automatically become 1 PM - 5 PM
+                    if (h >= 1 && h <= 5) h += 12; 
+                } else {
+                    if (new Date().getHours() >= 12 && h < 12) h += 12; 
+                }
             }
             return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
         }
@@ -150,12 +153,12 @@
                 }
 
                 // B. Parse Range or Single Time
-                const rangeMatch = speech.match(/from (.*?) to (.*)/);
+                const rangeMatch = speech.match(/from (.*?) (?:to|until|till|through) (.*)/);
 
                 if (rangeMatch) {
-                    // Handle Range
-                    const startT = parseVoiceTime(rangeMatch[1]);
-                    const endT = parseVoiceTime(rangeMatch[2]);
+                    // Handle Range with Shift Assumption
+                    const startT = parseVoiceTime(rangeMatch[1], true);
+                    const endT = parseVoiceTime(rangeMatch[2], true);
                     
                     if (startT) document.getElementById('start-time').value = startT;
                     if (endT) document.getElementById('end-time').value = endT;
@@ -164,9 +167,9 @@
                     // Handle Single Action
                     const isStart = /started|start|clock in|got to work/.test(speech);
                     const isEnd = /left|end|finished|clock out/.test(speech);
-                    const time = parseVoiceTime(speech);
+                    const time = parseVoiceTime(speech, false);
 
-                    const finalTime = time || ( () => {
+                    let finalTime = time || ( () => {
                         const now = new Date();
                         let min = Math.round(now.getMinutes() / 5) * 5;
                         let hr = now.getHours();
@@ -174,10 +177,29 @@
                         return hr.toString().padStart(2, '0') + ":" + min.toString().padStart(2, '0');
                     })();
 
+                    // Chronology Checker
                     if (isStart) {
+                        let currentEnd = document.getElementById('end-time').value;
+                        if (currentEnd) {
+                            let [nh, nm] = finalTime.split(':').map(Number);
+                            let [oh, om] = currentEnd.split(':').map(Number);
+                            if (nh * 60 + nm > oh * 60 + om && nh >= 12) {
+                                nh -= 12; // Flip PM back to AM
+                                finalTime = nh.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
+                            }
+                        }
                         document.getElementById('start-time').value = finalTime;
                         notification("✅ Start: " + format12h(finalTime));
                     } else if (isEnd) {
+                        let currentStart = document.getElementById('start-time').value;
+                        if (currentStart) {
+                            let [nh, nm] = finalTime.split(':').map(Number);
+                            let [oh, om] = currentStart.split(':').map(Number);
+                            if (nh * 60 + nm < oh * 60 + om && nh < 12) {
+                                nh += 12; // Flip AM forward to PM
+                                finalTime = nh.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
+                            }
+                        }
                         document.getElementById('end-time').value = finalTime;
                         notification("✅ End: " + format12h(finalTime));
                     }
