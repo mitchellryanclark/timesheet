@@ -73,16 +73,29 @@
         document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
 
         function parseVoiceTime(text) {
-            const match = text.match(/(\d{1,2})[:\s]?(\d{2})?/);
+            // 1. Map natural language to AM/PM intent
+            let isAM = /am|a\.m\.|morning/.test(text);
+            let isPM = /pm|p\.m\.|evening|night|tonight|afternoon/.test(text);
+
+            // 2. Scrub dates and ordinals from the text so they aren't read as hours
+            let cleanText = text.replace(/\b\d{1,2}(st|nd|rd|th)\b/g, ''); 
+            cleanText = cleanText.replace(/on the \d{1,2}/g, '');
+            cleanText = cleanText.replace(/yesterday|today/g, '');
+
+            // 3. Find the actual time digits in the scrubbed text
+            const match = cleanText.match(/(\d{1,2})[:\s]?(\d{2})?/);
             if (!match) return null;
+
             let h = parseInt(match[1]);
             let m = match[2] ? parseInt(match[2]) : 0;
             
-            if (text.includes("am") || text.includes("a.m.")) {
+            // 4. Apply the AM/PM logic
+            if (isAM) {
                 if (h === 12) h = 0;
-            } else if (text.includes("pm") || text.includes("p.m.")) {
+            } else if (isPM) {
                 if (h < 12) h += 12;
             } else {
+                // If no AM/PM indicator was spoken, fallback to current clock
                 if (new Date().getHours() >= 12 && h < 12) h += 12; 
             }
             return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
@@ -97,23 +110,30 @@
                 const speech = event.results[0][0].transcript.toLowerCase();
                 const dateField = document.getElementById('date');
 
-                // 1. Determine the Date FIRST
+                // A. Determine Date First
                 let targetDate = new Date();
                 if (speech.includes("yesterday")) {
                     targetDate.setDate(targetDate.getDate() - 1);
                 } else {
-                    const dayMatch = speech.match(/on the (\d{1,2})/);
+                    const dayMatch = speech.match(/(?:on )?(?:the )?(\d{1,2})(?:st|nd|rd|th)/) || speech.match(/on the (\d{1,2})/);
                     if (dayMatch) {
                         targetDate.setDate(parseInt(dayMatch[1]));
                     }
                 }
                 
+                // Only fill date if a time intent is also found or explicit date words used
                 const y = targetDate.getFullYear();
                 const mo = String(targetDate.getMonth() + 1).padStart(2, '0');
                 const d = String(targetDate.getDate()).padStart(2, '0');
-                dateField.value = `${y}-${mo}-${d}`;
+                
+                if (speech.includes("yesterday") || speech.includes("today") || speech.match(/(?:on )?(?:the )?(\d{1,2})/)) {
+                   dateField.value = `${y}-${mo}-${d}`; 
+                } else if (!dateField.value) {
+                   // Fallback to today if field is empty and no specific day was requested
+                   dateField.value = `${y}-${mo}-${d}`; 
+                }
 
-                // 2. Determine Time Intent
+                // B. Determine Time
                 const isStart = /started|start|clock in|got to work/.test(speech);
                 const isEnd = /left|end|finished|clock out/.test(speech);
                 const time = parseVoiceTime(speech);
