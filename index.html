@@ -98,6 +98,39 @@
             setTimeout(() => bar.style.top = "-100px", 4000);
         };
 
+        // --- VOICE LOGIC ---
+        document.getElementById('mic-btn').onclick = () => {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.start();
+            notification("🎤 Listening for times...", "#28a745");
+
+            recognition.onresult = (event) => {
+                let speech = event.results[0][0].transcript.toLowerCase();
+                notification(`Heard: "${speech}"`);
+                
+                // Helper to convert "10 am" or "2:30 pm" to 24hr format "10:00" or "14:30"
+                const parseTime = (timeStr) => {
+                    let [time, modifier] = timeStr.split(/(am|pm)/);
+                    let [hours, minutes] = time.trim().split(':');
+                    if (!minutes) minutes = "00";
+                    hours = parseInt(hours);
+                    if (modifier === 'pm' && hours < 12) hours += 12;
+                    if (modifier === 'am' && hours === 12) hours = 0;
+                    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                };
+
+                const times = speech.match(/(\d+(?::\d+)?\s*(?:am|pm)?)/g);
+                if (times && times.length >= 2) {
+                    document.getElementById('start-time').value = parseTime(times[0]);
+                    document.getElementById('end-time').value = parseTime(times[1]);
+                    updateLiveCalc();
+                } else {
+                    notification("⚠️ Couldn't catch both times. Try '10am to 2pm'", "#e67e22");
+                }
+            };
+        };
+
         function updateLiveCalc() {
             const s = document.getElementById('start-time').value;
             const e = document.getElementById('end-time').value;
@@ -145,7 +178,6 @@
             renderCalendar();
         };
 
-        // --- STANDARD SAVE BUTTON ---
         document.getElementById("add-btn").onclick = async () => {
             const d = document.getElementById("date").value;
             const s = document.getElementById("start-time").value;
@@ -173,7 +205,6 @@
             }
         };
 
-        // --- NEW AUTHORIZE BUTTON ---
         document.getElementById("auth-btn").onclick = async () => {
             const dateVal = document.getElementById("date").value;
             if (!dateVal) {
@@ -181,7 +212,6 @@
                 return;
             }
 
-            // Figure out the month and period based on the selected date
             const [yy, mm, dd] = dateVal.split('-');
             const yearNum = parseInt(yy);
             const monthNum = parseInt(mm);
@@ -191,7 +221,6 @@
             const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
             const monthName = monthNames[monthNum - 1];
 
-            // Confirm with the user
             const confirmMsg = `Are you sure you want to finalize the invoice for:\n\n${monthName} ${yearNum} (${periodString})\n\nThis will instantly generate your PDF and save it to your Payroll folder.`;
             if (!confirm(confirmMsg)) return;
 
@@ -208,7 +237,6 @@
                         monthName: monthName
                     })
                 });
-                // Note: With no-cors, I can't read the exact server response, but if it doesn't throw a network error, it went through.
                 setTimeout(() => notification("✅ PDF Saved to your Google Drive Folder!", "#28a745"), 1500);
             } catch (err) {
                 notification("⚠️ Network error. Could not authorize.", "#dc3545");
@@ -255,7 +283,6 @@
             renderCalendar();
         }
 
-        // Render calendar on first load without selecting a date
         renderCalendar();
     </script>
 </body>
