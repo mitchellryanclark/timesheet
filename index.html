@@ -125,15 +125,14 @@
             
             let anchorMins = ah * 60 + am;
             let opt1Mins = nh * 60 + nm;
-            let opt2Mins = (nh < 12 ? nh + 12 : nh - 12) * 60 + nm; // Flipped AM/PM
+            let opt2Mins = (nh < 12 ? nh + 12 : nh - 12) * 60 + nm; 
             
             let dur1 = isSettingStart ? anchorMins - opt1Mins : opt1Mins - anchorMins;
-            if (dur1 < 0) dur1 += 1440; // overnight check
+            if (dur1 < 0) dur1 += 1440; 
             
             let dur2 = isSettingStart ? anchorMins - opt2Mins : opt2Mins - anchorMins;
             if (dur2 < 0) dur2 += 1440;
             
-            // If the flipped time creates a shift shorter than 14 hours AND shorter than the original, use it.
             if (dur2 < 840 && dur2 < dur1) {
                 let bestH = Math.floor(opt2Mins / 60);
                 return bestH.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
@@ -174,10 +173,14 @@
                         let isLast = !!weekdayMatch[1];
                         let spokenDay = daysOfWeek.indexOf(weekdayMatch[2]);
                         let todayDay = targetDate.getDay();
-                        let daysAgo = todayDay - spokenDay;
                         
-                        if (daysAgo <= 0) daysAgo += 7; // Force it into the past
-                        if (isLast) daysAgo += 7; // Go back one additional week
+                        let daysAgo = todayDay - spokenDay;
+                        if (daysAgo <= 0) daysAgo += 7; // Get the most recent occurrence
+
+                        // If "Last" is spoken, only add 7 days if the most recent occurrence was THIS calendar week
+                        if (isLast && daysAgo < todayDay) {
+                            daysAgo += 7;
+                        }
                         
                         targetDate.setDate(targetDate.getDate() - daysAgo);
                         dateFound = true;
@@ -230,7 +233,6 @@
                         return hr.toString().padStart(2, '0') + ":" + min.toString().padStart(2, '0');
                     })();
 
-                    // Chronology Checker (Duration-based)
                     if (isStart) {
                         let currentEnd = document.getElementById('end-time').value;
                         if (currentEnd && !hasExplicitAMPM) {
