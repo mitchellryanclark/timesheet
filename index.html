@@ -73,6 +73,21 @@
         document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
 
         function parseVoiceTime(text, isRange = false) {
+            // Map spelled-out numbers to digits
+            const numMap = {"one":"1","two":"2","three":"3","four":"4","five":"5","six":"6","seven":"7","eight":"8","nine":"9","ten":"10","eleven":"11","twelve":"12"};
+            for(let w in numMap) {
+                text = text.replace(new RegExp('\\b' + w + '\\b', 'g'), numMap[w]);
+            }
+
+            // Handle fractions mathematically
+            text = text.replace(/quarter to (\d{1,2})/, (m, h) => {
+                let hr = parseInt(h) - 1;
+                if(hr <= 0) hr += 12;
+                return hr + ":45";
+            });
+            text = text.replace(/quarter past (\d{1,2})/, (m, h) => h + ":15");
+            text = text.replace(/half past (\d{1,2})/, (m, h) => h + ":30");
+
             if (/\bnoon\b/.test(text)) return "12:00";
             if (/\bmidnight\b/.test(text)) return "00:00";
 
@@ -96,7 +111,6 @@
                 if (h < 12) h += 12;
             } else {
                 if (isRange) {
-                    // Daytime Shift Assumption: Numbers 1-5 automatically become 1 PM - 5 PM
                     if (h >= 1 && h <= 5) h += 12; 
                 } else {
                     if (new Date().getHours() >= 12 && h < 12) h += 12; 
@@ -118,6 +132,7 @@
             recognition.onresult = (event) => {
                 const speech = event.results[0][0].transcript.toLowerCase();
                 const dateField = document.getElementById('date');
+                const hasExplicitAMPM = /am|a\.m\.|pm|p\.m\.|morning|night|evening|afternoon/.test(speech);
 
                 // A. Parse Date & Explicit Months
                 let targetDate = new Date();
@@ -153,20 +168,28 @@
                 }
 
                 // B. Parse Range or Single Time
-                const rangeMatch = speech.match(/from (.*?) (?:to|until|till|through) (.*)/);
+                let handledAsRange = false;
+                
+                // Protect 'change' commands from being split by the word 'to'
+                if (!speech.includes("change")) {
+                    const rangeMatch = speech.match(/(?:from\s+)?(.*?)\s+(?:to|until|till|through)\s+(.*)/);
+                    if (rangeMatch) {
+                        const startT = parseVoiceTime(rangeMatch[1], true);
+                        const endT = parseVoiceTime(rangeMatch[2], true);
+                        
+                        if (startT && endT) {
+                            document.getElementById('start-time').value = startT;
+                            document.getElementById('end-time').value = endT;
+                            notification("✅ Range Set");
+                            handledAsRange = true;
+                        }
+                    }
+                }
 
-                if (rangeMatch) {
-                    // Handle Range with Shift Assumption
-                    const startT = parseVoiceTime(rangeMatch[1], true);
-                    const endT = parseVoiceTime(rangeMatch[2], true);
-                    
-                    if (startT) document.getElementById('start-time').value = startT;
-                    if (endT) document.getElementById('end-time').value = endT;
-                    notification("✅ Range Set");
-                } else {
+                if (!handledAsRange) {
                     // Handle Single Action
-                    const isStart = /started|start|clock in|got to work/.test(speech);
-                    const isEnd = /left|end|finished|clock out/.test(speech);
+                    const isStart = /started|start|clock in|got to work/.test(speech) || (speech.includes("change") && speech.includes("start"));
+                    const isEnd = /left|end|finished|clock out/.test(speech) || (speech.includes("change") && speech.includes("end"));
                     const time = parseVoiceTime(speech, false);
 
                     let finalTime = time || ( () => {
@@ -177,14 +200,14 @@
                         return hr.toString().padStart(2, '0') + ":" + min.toString().padStart(2, '0');
                     })();
 
-                    // Chronology Checker
+                    // Chronology Checker (Bypassed if user is explicit)
                     if (isStart) {
                         let currentEnd = document.getElementById('end-time').value;
-                        if (currentEnd) {
+                        if (currentEnd && !hasExplicitAMPM) {
                             let [nh, nm] = finalTime.split(':').map(Number);
                             let [oh, om] = currentEnd.split(':').map(Number);
                             if (nh * 60 + nm > oh * 60 + om && nh >= 12) {
-                                nh -= 12; // Flip PM back to AM
+                                nh -= 12; 
                                 finalTime = nh.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
                             }
                         }
@@ -192,11 +215,11 @@
                         notification("✅ Start: " + format12h(finalTime));
                     } else if (isEnd) {
                         let currentStart = document.getElementById('start-time').value;
-                        if (currentStart) {
+                        if (currentStart && !hasExplicitAMPM) {
                             let [nh, nm] = finalTime.split(':').map(Number);
                             let [oh, om] = currentStart.split(':').map(Number);
                             if (nh * 60 + nm < oh * 60 + om && nh < 12) {
-                                nh += 12; // Flip AM forward to PM
+                                nh += 12; 
                                 finalTime = nh.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
                             }
                         }
