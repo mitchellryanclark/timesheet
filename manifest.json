@@ -3,17 +3,13 @@
   "name": "Rush Process Timesheet",
   "icons": [
     {
-      "src": "https://via.placeholder.com/192",
+      "src": "https://cdn-icons-png.flaticon.com/512/2618/2618245.png",
       "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "https://via.placeholder.com/512",
-      "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "./index.html",
   "display": "standalone",
   "theme_color": "#28a745",
   "background_color": "#ffffff"
