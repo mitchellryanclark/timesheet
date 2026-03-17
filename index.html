@@ -15,7 +15,7 @@
         .time-box { background: #e9ecef; padding: 10px; border-radius: 5px; margin-top: 10px; text-align: center; font-weight: bold; }
     </style>
 </head>
-<body onload="setToday()" style="font-family: sans-serif; margin: 20px; max-width: 450px;">
+<body style="font-family: sans-serif; margin: 20px; max-width: 450px;">
 
     <div id="notification-bar">Verification: Time Logged!</div>
     <h2>Rush Timesheet Tracker</h2>
@@ -49,14 +49,6 @@
             bar.innerText = msg; bar.style.top = "0";
             setTimeout(() => bar.style.top = "-100px", 4000);
         };
-
-        function setToday() {
-            const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const d = String(now.getDate()).padStart(2, '0');
-            document.getElementById('date').value = `${y}-${m}-${d}`;
-        }
 
         function format12h(t) {
             if(!t) return "";
@@ -103,14 +95,25 @@
             
             recognition.onresult = (event) => {
                 const speech = event.results[0][0].transcript.toLowerCase();
-                
-                // Handle "Yesterday" logic
-                if (speech.includes("yesterday")) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - 1);
-                    document.getElementById('date').value = d.toISOString().split('T')[0];
-                }
+                const dateField = document.getElementById('date');
 
+                // 1. Determine the Date FIRST
+                let targetDate = new Date();
+                if (speech.includes("yesterday")) {
+                    targetDate.setDate(targetDate.getDate() - 1);
+                } else {
+                    const dayMatch = speech.match(/on the (\d{1,2})/);
+                    if (dayMatch) {
+                        targetDate.setDate(parseInt(dayMatch[1]));
+                    }
+                }
+                
+                const y = targetDate.getFullYear();
+                const mo = String(targetDate.getMonth() + 1).padStart(2, '0');
+                const d = String(targetDate.getDate()).padStart(2, '0');
+                dateField.value = `${y}-${mo}-${d}`;
+
+                // 2. Determine Time Intent
                 const isStart = /started|start|clock in|got to work/.test(speech);
                 const isEnd = /left|end|finished|clock out/.test(speech);
                 const time = parseVoiceTime(speech);
