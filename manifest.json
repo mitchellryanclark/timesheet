@@ -1,16 +1,15 @@
 {
-  "short_name": "RushTime",
-  "name": "Rush Process Timesheet",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/2618/2618245.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    }
-  ],
+  "name": "Rush Timesheet",
+  "short_name": "Timesheet",
   "start_url": "./index.html",
   "display": "standalone",
+  "background_color": "#f4f7f6",
   "theme_color": "#28a745",
-  "background_color": "#ffffff"
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2091/2091665.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
