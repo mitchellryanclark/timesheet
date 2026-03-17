@@ -16,6 +16,7 @@
         #mic-btn { background-color: #28a745; color: white; }
         #add-btn { background-color: #007bff; color: white; }
         #clear-btn { background-color: #6c757d; color: white; margin-bottom: 0; }
+        #auth-btn { background-color: #8e44ad; color: white; margin-bottom: 0; border: 2px solid #732d91; }
         label { font-size: 14px; font-weight: bold; color: #7f8c8d; display: block; margin-bottom: 5px; }
         input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #dfe6e9; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
         .time-box { background: #edf2f7; padding: 15px; border-radius: 10px; text-align: center; font-size: 1.3em; font-weight: bold; color: #2d3748; border: 1px dashed #cbd5e0; }
@@ -29,6 +30,7 @@
         .has-data::after { content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; background: #28a745; border-radius: 50%; }
         .selected-day { background: #007bff !important; color: white; font-weight: bold; border-color: #007bff; }
         .day-header { text-align: center; font-size: 12px; font-weight: bold; color: #a0aec0; padding-bottom: 5px; }
+        .helper-text { font-size: 13px; color: #7f8c8d; margin-bottom: 15px; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -78,8 +80,13 @@
         <div id="calendar-grid"></div>
     </div>
 
+    <div class="card" style="border-left: 5px solid #8e44ad;">
+        <h3>Finalize Invoice</h3>
+        <p class="helper-text">Select any date on the calendar above that falls within the pay period you want to close, then tap Authorize.</p>
+        <button id="auth-btn" class="btn-main">📑 Authorize & Generate PDF</button>
+    </div>
+
     <script>
-        // YOUR UNIQUE GOOGLE WEB APP URL
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwQlO9m1Bop3CIRR88dQNB5kI1qJ3MTTFtzT3_HDRIUC_D9QXW9zgAoc4lZzedGgMqF/exec"; 
         
         let currentViewDate = new Date();
@@ -88,7 +95,7 @@
             const bar = document.getElementById('notification-bar');
             bar.style.backgroundColor = color;
             bar.innerText = msg; bar.style.top = "0";
-            setTimeout(() => bar.style.top = "-100px", 3000);
+            setTimeout(() => bar.style.top = "-100px", 4000);
         };
 
         function updateLiveCalc() {
@@ -121,7 +128,6 @@
                 document.getElementById('start-time').value = entry.start || "";
                 document.getElementById('end-time').value = entry.end || "";
                 document.getElementById('pay-type').value = entry.type || "Regular";
-                notification("📂 Loaded Entry: " + dateStr);
             } else {
                 document.getElementById('start-time').value = "";
                 document.getElementById('end-time').value = "";
@@ -137,9 +143,9 @@
             document.getElementById('pay-type').value = "Regular";
             updateLiveCalc();
             renderCalendar();
-            notification("🧹 Screen Cleared", "#6c757d");
         };
 
+        // --- STANDARD SAVE BUTTON ---
         document.getElementById("add-btn").onclick = async () => {
             const d = document.getElementById("date").value;
             const s = document.getElementById("start-time").value;
@@ -149,25 +155,63 @@
 
             if (!d) return alert("Please select a Date first.");
 
-            // 1. LOCAL SAVE (Immediate / Offline)
             let history = JSON.parse(localStorage.getItem('rushTimesheet')) || {};
             history[d] = { start: s, end: e, type: pt, total: tot };
             localStorage.setItem('rushTimesheet', JSON.stringify(history));
-            
-            notification("💾 Saved to Phone");
             renderCalendar();
 
-            // 2. SILENT BACKGROUND SYNC (Requires Internet)
             try {
-                notification("☁️ Syncing to Drive...", "#007bff");
+                notification("☁️ Syncing time...", "#007bff");
                 await fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify({ date: d, start: s, end: e, type: pt, total: tot })
+                    body: JSON.stringify({ action: "save", date: d, start: s, end: e, type: pt, total: tot })
                 });
-                notification("✅ Drive Updated!");
+                notification("✅ Time Logged in Drive!");
             } catch (err) {
-                notification("⚠️ Sync Pending (Saved Offline)", "#e67e22");
+                notification("⚠️ Saved locally (Offline)", "#e67e22");
+            }
+        };
+
+        // --- NEW AUTHORIZE BUTTON ---
+        document.getElementById("auth-btn").onclick = async () => {
+            const dateVal = document.getElementById("date").value;
+            if (!dateVal) {
+                alert("Please select any date on the calendar first to indicate which pay period you want to close.");
+                return;
+            }
+
+            // Figure out the month and period based on the selected date
+            const [yy, mm, dd] = dateVal.split('-');
+            const yearNum = parseInt(yy);
+            const monthNum = parseInt(mm);
+            const dayNum = parseInt(dd);
+            
+            const periodString = dayNum <= 15 ? "1st - 15th" : "16th - End";
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const monthName = monthNames[monthNum - 1];
+
+            // Confirm with the user
+            const confirmMsg = `Are you sure you want to finalize the invoice for:\n\n${monthName} ${yearNum} (${periodString})\n\nThis will instantly generate your PDF and save it to your Payroll folder.`;
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                notification("⚙️ Authorizing & Generating PDF...", "#8e44ad");
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ 
+                        action: "authorize",
+                        monthNum: monthNum,
+                        yearNum: yearNum,
+                        periodString: periodString,
+                        monthName: monthName
+                    })
+                });
+                // Note: With no-cors, we can't read the exact server response, but if it doesn't throw a network error, it went through.
+                setTimeout(() => notification("✅ PDF Saved to your Google Drive Folder!", "#28a745"), 1500);
+            } catch (err) {
+                notification("⚠️ Network error. Could not authorize.", "#dc3545");
             }
         };
 
@@ -182,7 +226,6 @@
             const month = currentViewDate.getMonth();
             monthLabel.innerText = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(currentViewDate);
 
-            // Weekday Headers
             ['S','M','T','W','T','F','S'].forEach(day => {
                 grid.innerHTML += `<div class="day-header">${day}</div>`;
             });
@@ -212,7 +255,14 @@
             renderCalendar();
         }
 
-        renderCalendar();
+        // Auto-select today on first load
+        if (!document.getElementById('date').value) {
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            selectCalendarDate(todayStr);
+        } else {
+            renderCalendar();
+        }
     </script>
 </body>
 </html>
