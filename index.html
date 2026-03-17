@@ -73,13 +73,11 @@
         document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
 
         function parseVoiceTime(text, isRange = false) {
-            // Map spelled-out numbers to digits
             const numMap = {"one":"1","two":"2","three":"3","four":"4","five":"5","six":"6","seven":"7","eight":"8","nine":"9","ten":"10","eleven":"11","twelve":"12"};
             for(let w in numMap) {
                 text = text.replace(new RegExp('\\b' + w + '\\b', 'g'), numMap[w]);
             }
 
-            // Handle fractions mathematically
             text = text.replace(/quarter to (\d{1,2})/, (m, h) => {
                 let hr = parseInt(h) - 1;
                 if(hr <= 0) hr += 12;
@@ -98,6 +96,7 @@
             cleanText = cleanText.replace(/\b\d{1,2}(st|nd|rd|th)\b/g, ''); 
             cleanText = cleanText.replace(/on the \d{1,2}/g, '');
             cleanText = cleanText.replace(/yesterday|today/g, '');
+            cleanText = cleanText.replace(/(last\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/g, '');
 
             const match = cleanText.match(/(\d{1,2})[:\s]?(\d{2})?/);
             if (!match) return null;
@@ -119,10 +118,31 @@
             return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
         }
 
-        const monthMap = {
-            "january": 0, "february": 1, "march": 2, "april": 3, "may": 4, "june": 5,
-            "july": 6, "august": 7, "september": 8, "october": 9, "november": 10, "december": 11
-        };
+        // Duration logic for Chronology Checker
+        function optimizeShift(anchorTime, newTime, isSettingStart) {
+            let [ah, am] = anchorTime.split(':').map(Number);
+            let [nh, nm] = newTime.split(':').map(Number);
+            
+            let anchorMins = ah * 60 + am;
+            let opt1Mins = nh * 60 + nm;
+            let opt2Mins = (nh < 12 ? nh + 12 : nh - 12) * 60 + nm; // Flipped AM/PM
+            
+            let dur1 = isSettingStart ? anchorMins - opt1Mins : opt1Mins - anchorMins;
+            if (dur1 < 0) dur1 += 1440; // overnight check
+            
+            let dur2 = isSettingStart ? anchorMins - opt2Mins : opt2Mins - anchorMins;
+            if (dur2 < 0) dur2 += 1440;
+            
+            // If the flipped time creates a shift shorter than 14 hours AND shorter than the original, use it.
+            if (dur2 < 840 && dur2 < dur1) {
+                let bestH = Math.floor(opt2Mins / 60);
+                return bestH.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
+            }
+            return newTime;
+        }
+
+        const monthMap = {"january": 0, "february": 1, "march": 2, "april": 3, "may": 4, "june": 5, "july": 6, "august": 7, "september": 8, "october": 9, "november": 10, "december": 11};
+        const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -134,7 +154,7 @@
                 const dateField = document.getElementById('date');
                 const hasExplicitAMPM = /am|a\.m\.|pm|p\.m\.|morning|night|evening|afternoon/.test(speech);
 
-                // A. Parse Date & Explicit Months
+                // A. Parse Date & Explicit Months & Weekdays
                 let targetDate = new Date();
                 let dateFound = false;
 
@@ -144,10 +164,22 @@
                 } else {
                     const monthMatch = speech.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})/);
                     const dayMatch = speech.match(/(?:on )?(?:the )?(\d{1,2})(?:st|nd|rd|th)/) || speech.match(/on the (\d{1,2})/);
+                    const weekdayMatch = speech.match(/(last\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/);
 
                     if (monthMatch) {
                         targetDate.setMonth(monthMap[monthMatch[1]]);
                         targetDate.setDate(parseInt(monthMatch[2]));
+                        dateFound = true;
+                    } else if (weekdayMatch) {
+                        let isLast = !!weekdayMatch[1];
+                        let spokenDay = daysOfWeek.indexOf(weekdayMatch[2]);
+                        let todayDay = targetDate.getDay();
+                        let daysAgo = todayDay - spokenDay;
+                        
+                        if (daysAgo <= 0) daysAgo += 7; // Force it into the past
+                        if (isLast) daysAgo += 7; // Go back one additional week
+                        
+                        targetDate.setDate(targetDate.getDate() - daysAgo);
                         dateFound = true;
                     } else if (dayMatch) {
                         targetDate.setDate(parseInt(dayMatch[1]));
@@ -170,7 +202,6 @@
                 // B. Parse Range or Single Time
                 let handledAsRange = false;
                 
-                // Protect 'change' commands from being split by the word 'to'
                 if (!speech.includes("change")) {
                     const rangeMatch = speech.match(/(?:from\s+)?(.*?)\s+(?:to|until|till|through)\s+(.*)/);
                     if (rangeMatch) {
@@ -187,7 +218,6 @@
                 }
 
                 if (!handledAsRange) {
-                    // Handle Single Action
                     const isStart = /started|start|clock in|got to work/.test(speech) || (speech.includes("change") && speech.includes("start"));
                     const isEnd = /left|end|finished|clock out/.test(speech) || (speech.includes("change") && speech.includes("end"));
                     const time = parseVoiceTime(speech, false);
@@ -200,28 +230,18 @@
                         return hr.toString().padStart(2, '0') + ":" + min.toString().padStart(2, '0');
                     })();
 
-                    // Chronology Checker (Bypassed if user is explicit)
+                    // Chronology Checker (Duration-based)
                     if (isStart) {
                         let currentEnd = document.getElementById('end-time').value;
                         if (currentEnd && !hasExplicitAMPM) {
-                            let [nh, nm] = finalTime.split(':').map(Number);
-                            let [oh, om] = currentEnd.split(':').map(Number);
-                            if (nh * 60 + nm > oh * 60 + om && nh >= 12) {
-                                nh -= 12; 
-                                finalTime = nh.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
-                            }
+                            finalTime = optimizeShift(currentEnd, finalTime, true);
                         }
                         document.getElementById('start-time').value = finalTime;
                         notification("✅ Start: " + format12h(finalTime));
                     } else if (isEnd) {
                         let currentStart = document.getElementById('start-time').value;
                         if (currentStart && !hasExplicitAMPM) {
-                            let [nh, nm] = finalTime.split(':').map(Number);
-                            let [oh, om] = currentStart.split(':').map(Number);
-                            if (nh * 60 + nm < oh * 60 + om && nh < 12) {
-                                nh += 12; 
-                                finalTime = nh.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
-                            }
+                            finalTime = optimizeShift(currentStart, finalTime, false);
                         }
                         document.getElementById('end-time').value = finalTime;
                         notification("✅ End: " + format12h(finalTime));
