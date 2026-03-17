@@ -73,33 +73,39 @@
         document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
 
         function parseVoiceTime(text) {
-            // 1. Map natural language to AM/PM intent
+            // Check for explicit Noon / Midnight
+            if (/\bnoon\b/.test(text)) return "12:00";
+            if (/\bmidnight\b/.test(text)) return "00:00";
+
             let isAM = /am|a\.m\.|morning/.test(text);
             let isPM = /pm|p\.m\.|evening|night|tonight|afternoon/.test(text);
 
-            // 2. Scrub dates and ordinals from the text so they aren't read as hours
-            let cleanText = text.replace(/\b\d{1,2}(st|nd|rd|th)\b/g, ''); 
+            // Scrub dates so they aren't read as hours
+            let cleanText = text.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/g, '');
+            cleanText = cleanText.replace(/\b\d{1,2}(st|nd|rd|th)\b/g, ''); 
             cleanText = cleanText.replace(/on the \d{1,2}/g, '');
             cleanText = cleanText.replace(/yesterday|today/g, '');
 
-            // 3. Find the actual time digits in the scrubbed text
             const match = cleanText.match(/(\d{1,2})[:\s]?(\d{2})?/);
             if (!match) return null;
 
             let h = parseInt(match[1]);
             let m = match[2] ? parseInt(match[2]) : 0;
             
-            // 4. Apply the AM/PM logic
             if (isAM) {
                 if (h === 12) h = 0;
             } else if (isPM) {
                 if (h < 12) h += 12;
             } else {
-                // If no AM/PM indicator was spoken, fallback to current clock
                 if (new Date().getHours() >= 12 && h < 12) h += 12; 
             }
             return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
         }
+
+        const monthMap = {
+            "january": 0, "february": 1, "march": 2, "april": 3, "may": 4, "june": 5,
+            "july": 6, "august": 7, "september": 8, "october": 9, "november": 10, "december": 11
+        };
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -110,48 +116,71 @@
                 const speech = event.results[0][0].transcript.toLowerCase();
                 const dateField = document.getElementById('date');
 
-                // A. Determine Date First
+                // A. Parse Date & Explicit Months
                 let targetDate = new Date();
+                let dateFound = false;
+
                 if (speech.includes("yesterday")) {
                     targetDate.setDate(targetDate.getDate() - 1);
+                    dateFound = true;
                 } else {
+                    const monthMatch = speech.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})/);
                     const dayMatch = speech.match(/(?:on )?(?:the )?(\d{1,2})(?:st|nd|rd|th)/) || speech.match(/on the (\d{1,2})/);
-                    if (dayMatch) {
+
+                    if (monthMatch) {
+                        targetDate.setMonth(monthMap[monthMatch[1]]);
+                        targetDate.setDate(parseInt(monthMatch[2]));
+                        dateFound = true;
+                    } else if (dayMatch) {
                         targetDate.setDate(parseInt(dayMatch[1]));
+                        dateFound = true;
+                    } else if (speech.includes("today")) {
+                        dateFound = true;
                     }
                 }
                 
-                // Only fill date if a time intent is also found or explicit date words used
                 const y = targetDate.getFullYear();
                 const mo = String(targetDate.getMonth() + 1).padStart(2, '0');
                 const d = String(targetDate.getDate()).padStart(2, '0');
                 
-                if (speech.includes("yesterday") || speech.includes("today") || speech.match(/(?:on )?(?:the )?(\d{1,2})/)) {
+                if (dateFound) {
                    dateField.value = `${y}-${mo}-${d}`; 
                 } else if (!dateField.value) {
-                   // Fallback to today if field is empty and no specific day was requested
                    dateField.value = `${y}-${mo}-${d}`; 
                 }
 
-                // B. Determine Time
-                const isStart = /started|start|clock in|got to work/.test(speech);
-                const isEnd = /left|end|finished|clock out/.test(speech);
-                const time = parseVoiceTime(speech);
+                // B. Parse Range or Single Time
+                const rangeMatch = speech.match(/from (.*?) to (.*)/);
 
-                const finalTime = time || ( () => {
-                    const now = new Date();
-                    let min = Math.round(now.getMinutes() / 5) * 5;
-                    let hr = now.getHours();
-                    if(min===60) { min=0; hr++; }
-                    return hr.toString().padStart(2, '0') + ":" + min.toString().padStart(2, '0');
-                })();
+                if (rangeMatch) {
+                    // Handle Range
+                    const startT = parseVoiceTime(rangeMatch[1]);
+                    const endT = parseVoiceTime(rangeMatch[2]);
+                    
+                    if (startT) document.getElementById('start-time').value = startT;
+                    if (endT) document.getElementById('end-time').value = endT;
+                    notification("✅ Range Set");
+                } else {
+                    // Handle Single Action
+                    const isStart = /started|start|clock in|got to work/.test(speech);
+                    const isEnd = /left|end|finished|clock out/.test(speech);
+                    const time = parseVoiceTime(speech);
 
-                if (isStart) {
-                    document.getElementById('start-time').value = finalTime;
-                    notification("✅ Start: " + format12h(finalTime));
-                } else if (isEnd) {
-                    document.getElementById('end-time').value = finalTime;
-                    notification("✅ End: " + format12h(finalTime));
+                    const finalTime = time || ( () => {
+                        const now = new Date();
+                        let min = Math.round(now.getMinutes() / 5) * 5;
+                        let hr = now.getHours();
+                        if(min===60) { min=0; hr++; }
+                        return hr.toString().padStart(2, '0') + ":" + min.toString().padStart(2, '0');
+                    })();
+
+                    if (isStart) {
+                        document.getElementById('start-time').value = finalTime;
+                        notification("✅ Start: " + format12h(finalTime));
+                    } else if (isEnd) {
+                        document.getElementById('end-time').value = finalTime;
+                        notification("✅ End: " + format12h(finalTime));
+                    }
                 }
                 updateLiveCalc();
             };
