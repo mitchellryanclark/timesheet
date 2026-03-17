@@ -41,18 +41,7 @@
     <div id="auto-calc-display" class="time-box">Total: 0.00 hours</div>
     <br>
 
-    <label>Pay Type:</label><br>
-    <select id="pay-type" style="width: 100%; padding: 8px; margin-top: 5px;">
-        <option value="Regular">Regular</option>
-        <option value="Vacay Pay">Vacay Pay</option>
-        <option value="Holiday Pay">Holiday Pay</option>
-        <option value="Sick Day">Sick Day</option>
-    </select><br><br>
-
     <button id="add-btn" style="padding: 12px; font-weight: bold; background-color: #007bff; color: white; border: none; border-radius: 6px; width: 100%; cursor: pointer;">Log Hours Locally</button>
-
-    <h3>History:</h3>
-    <div id="log-display" style="background: #f0f0f0; padding: 15px; border-radius: 8px; line-height: 1.6;"></div>
 
     <script>
         const notification = (msg) => {
@@ -68,80 +57,77 @@
             return (h % 12 || 12) + ":" + m + " " + ampm;
         }
 
+        function setLocalToday() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            document.getElementById('date').value = `${y}-${m}-${d}`;
+        }
+
         function updateLiveCalc() {
             const s = document.getElementById('start-time').value;
             const e = document.getElementById('end-time').value;
             if (s && e) {
                 let start = s.split(':'), end = e.split(':');
-                let diff = ((parseInt(end[0])*60)+parseInt(end[1])) - ((parseInt(start[0])*60)+parseInt(start[1]));
+                let startMins = (parseInt(start[0]) * 60) + parseInt(start[1]);
+                let endMins = (parseInt(end[0]) * 60) + parseInt(end[1]);
+                let diff = endMins - startMins;
                 if (diff < 0) diff += 1440;
                 document.getElementById('auto-calc-display').innerHTML = `Total: <strong>${(diff/60).toFixed(2)}</strong> hours`;
             }
         }
 
-        // Listen for manual changes to auto-update calc
-        document.querySelectorAll('.time-input').forEach(input => {
-            input.addEventListener('input', updateLiveCalc);
-        });
+        document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
 
         function parseVoiceTime(text) {
             const match = text.match(/(\d{1,2})[:\s]?(\d{2})?/);
             if (!match) return null;
             let h = parseInt(match[1]);
             let m = match[2] ? parseInt(match[2]) : 0;
-            // Simple logic: if hour is 1-7, assume PM for workdays
-            if (h >= 1 && h <= 7 && !text.includes("am")) h += 12;
+            const now = new Date();
+            
+            if (text.includes("pm") && h < 12) h += 12;
+            else if (text.includes("am") && h === 12) h = 0;
+            else if (!text.includes("am") && !text.includes("pm")) {
+                // RULE: Use current clock AM/PM if not specified
+                if (now.getHours() >= 12 && h < 12) h += 12; 
+            }
             return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
         }
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
-            document.getElementById('mic-btn').onclick = () => { recognition.start(); };
+            document.getElementById('mic-btn').onclick = () => { 
+                setLocalToday();
+                recognition.start(); 
+            };
             
             recognition.onresult = (event) => {
                 const speech = event.results[0][0].transcript.toLowerCase();
-                document.getElementById('date').valueAsDate = new Date();
-                
-                // ADJUSTMENT LOGIC
-                if (speech.includes("started at") || speech.includes("start time to") || speech.includes("clock in")) {
-                    const time = speech.includes("at") || speech.includes("to") ? parseVoiceTime(speech) : null;
-                    const finalTime = time || ( () => {
-                        const now = new Date();
-                        let m = Math.round(now.getMinutes() / 5) * 5;
-                        let h = now.getHours();
-                        if(m===60) { m=0; h++; }
-                        return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
-                    })();
+                const isStart = /started|start|clock in|got to work/.test(speech);
+                const isEnd = /left|end|finished|clock out/.test(speech);
+                const time = parseVoiceTime(speech);
+
+                const finalTime = time || ( () => {
+                    const now = new Date();
+                    let m = Math.round(now.getMinutes() / 5) * 5;
+                    let h = now.getHours();
+                    if(m===60) { m=0; h++; }
+                    return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
+                })();
+
+                if (isStart) {
                     document.getElementById('start-time').value = finalTime;
                     notification("✅ Start: " + format12h(finalTime));
-                }
-
-                if (speech.includes("left at") || speech.includes("end time to") || speech.includes("clock out")) {
-                    const time = speech.includes("at") || speech.includes("to") ? parseVoiceTime(speech) : null;
-                    const finalTime = time || ( () => {
-                        const now = new Date();
-                        let m = Math.round(now.getMinutes() / 5) * 5;
-                        let h = now.getHours();
-                        if(m===60) { m=0; h++; }
-                        return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
-                    })();
+                } else if (isEnd) {
                     document.getElementById('end-time').value = finalTime;
                     notification("✅ End: " + format12h(finalTime));
                 }
                 updateLiveCalc();
             };
         }
-
-        document.getElementById("add-btn").onclick = () => {
-            const d = document.getElementById("date").value;
-            const s = document.getElementById("start-time").value;
-            const e = document.getElementById("end-time").value;
-            if (!d || !s || !e) return alert("Missing data!");
-            const row = `<div>📅 ${d} | 🕒 ${format12h(s)} - ${format12h(e)}</div>`;
-            document.getElementById("log-display").innerHTML += row;
-            notification("💾 Saved to History");
-        };
     </script>
 </body>
 </html>
