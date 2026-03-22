@@ -5,33 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rush Timesheet</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
     <meta name="theme-color" content="#28a745">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; max-width: 450px; background-color: #f4f7f6; color: #333; }
-        #notification-bar { position: fixed; top: -100px; left: 0; width: 100%; background-color: #28a745; color: white; text-align: center; padding: 15px; font-weight: bold; transition: top 0.5s; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        h2, h3 { margin-top: 0; color: #2c3e50; }
-        .btn-main { padding: 16px; width: 100%; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 12px; transition: transform 0.1s, opacity 0.2s; }
-        .btn-main:active { transform: scale(0.98); }
-        #mic-btn { background-color: #28a745; color: white; }
-        #add-btn { background-color: #007bff; color: white; }
-        #clear-btn { background-color: #6c757d; color: white; margin-bottom: 0; }
-        #auth-btn { background-color: #8e44ad; color: white; margin-bottom: 0; border: 2px solid #732d91; }
-        label { font-size: 14px; font-weight: bold; color: #7f8c8d; display: block; margin-bottom: 5px; }
-        input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #dfe6e9; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
-        .time-box { background: #edf2f7; padding: 15px; border-radius: 10px; text-align: center; font-size: 1.3em; font-weight: bold; color: #2d3748; border: 1px dashed #cbd5e0; }
-        
-        /* Calendar Styling */
-        #calendar-controls { display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; }
-        .cal-nav { background: none; border: 1px solid #ddd; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-        #calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-        .calendar-day { padding: 12px 0; text-align: center; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; font-size: 14px; cursor: pointer; position: relative; transition: background 0.2s; }
-        .calendar-day:hover { background: #f8f9fa; }
-        .has-data::after { content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; background: #28a745; border-radius: 50%; }
-        .selected-day { background: #007bff !important; color: white; font-weight: bold; border-color: #007bff; }
-        .day-header { text-align: center; font-size: 12px; font-weight: bold; color: #a0aec0; padding-bottom: 5px; }
-        .helper-text { font-size: 13px; color: #7f8c8d; margin-bottom: 15px; line-height: 1.4; }
-    </style>
 </head>
 <body>
 
@@ -54,6 +29,10 @@
                 <input type="time" id="end-time" class="time-input">
             </div>
         </div>
+
+        <label>Lunch Deduction (Hours):</label>
+        <input type="number" id="lunch-break" step="0.25" value="0" placeholder="e.g. 0.5">
+        <small style="display: block; margin-top: -12px; margin-bottom: 12px; font-size: 11px; color: var(--text-muted);">0.5 = 30m, 0.75 = 45m</small>
 
         <div id="auto-calc-display" class="time-box">Total: 0.00 hours</div>
         <br>
@@ -82,310 +61,22 @@
 
     <div class="card" style="border-left: 5px solid #8e44ad;">
         <h3>Finalize Invoice</h3>
-        <p class="helper-text">Select any date on the calendar above that falls within the pay period you want to close, then tap Authorize.</p>
-        <button id="auth-btn" class="btn-main">📑 Authorize & Generate PDF</button>
+        <p class="helper-text">Select a date on the calendar, then tap Authorize to generate the PDF for that pay period.</p>
+        <div style="display: flex; gap: 10px; flex-direction: column;">
+            <button id="auth-btn" class="btn-main">📑 1. Generate & Review</button>
+            <button id="send-employer-btn" class="btn-main" style="background-color: #d35400;">📤 2. Approve & Send to Employer</button>
+        </div>
     </div>
 
     <script>
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwQlO9m1Bop3CIRR88dQNB5kI1qJ3MTTFtzT3_HDRIUC_D9QXW9zgAoc4lZzedGgMqF/exec"; 
-        
-        let currentViewDate = new Date();
-
-        const notification = (msg, color = "#28a745") => {
-            const bar = document.getElementById('notification-bar');
-            bar.style.backgroundColor = color;
-            bar.innerText = msg; bar.style.top = "0";
-            setTimeout(() => bar.style.top = "-100px", 4000);
-        };
-
-        function format12h(t) {
-            if(!t) return "";
-            let [h, m] = t.split(':');
-            let ampm = h >= 12 ? 'PM' : 'AM';
-            return (h % 12 || 12) + ":" + m + " " + ampm;
-        }
-
-        function updateLiveCalc() {
-            const s = document.getElementById('start-time').value;
-            const e = document.getElementById('end-time').value;
-            if (s && e) {
-                let start = s.split(':'), end = e.split(':');
-                let startMins = (parseInt(start[0]) * 60) + parseInt(start[1]);
-                let endMins = (parseInt(end[0]) * 60) + parseInt(end[1]);
-                let diff = endMins - startMins;
-                if (diff < 0) diff += 1440; // Over-midnight handler
-                document.getElementById('auto-calc-display').innerHTML = `Total: <strong>${(diff/60).toFixed(2)}</strong> hours`;
-                return (diff/60).toFixed(2);
-            }
-            document.getElementById('auto-calc-display').innerHTML = `Total: 0.00 hours`;
-            return "0.00";
-        }
-
-        document.querySelectorAll('.time-input').forEach(i => i.oninput = updateLiveCalc);
-
-        // --- ENHANCED VOICE LOGIC ---
-        function parseVoiceTime(text, isRange = false) {
-            const numMap = {"one":"1","two":"2","three":"3","four":"4","five":"5","six":"6","seven":"7","eight":"8","nine":"9","ten":"10","eleven":"11","twelve":"12"};
-            for(let w in numMap) text = text.replace(new RegExp('\\b' + w + '\\b', 'g'), numMap[w]);
-
-            text = text.replace(/quarter to (\d{1,2})/, (m, h) => {
-                let hr = parseInt(h) - 1;
-                if(hr <= 0) hr += 12;
-                return hr + ":45";
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js').catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
             });
-            text = text.replace(/quarter past (\d{1,2})/, (m, h) => h + ":15");
-            text = text.replace(/half past (\d{1,2})/, (m, h) => h + ":30");
-
-            if (/\bnoon\b/.test(text)) return "12:00";
-            if (/\bmidnight\b/.test(text)) return "00:00";
-
-            let isAM = /am|a\.m\.|morning/.test(text);
-            let isPM = /pm|p\.m\.|evening|night|tonight|afternoon/.test(text);
-
-            let cleanText = text.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/g, '');
-            cleanText = cleanText.replace(/\b\d{1,2}(st|nd|rd|th)\b/g, '').replace(/on the \d{1,2}/g, '').replace(/yesterday|today/g, '');
-
-            const match = cleanText.match(/(\d{1,2})[:\s]?(\d{2})?/);
-            if (!match) return null;
-
-            let h = parseInt(match[1]);
-            let m = match[2] ? parseInt(match[2]) : 0;
-            
-            if (isAM) { if (h === 12) h = 0; }
-            else if (isPM) { if (h < 12) h += 12; }
-            else if (isRange && h >= 1 && h <= 5) h += 12; 
-
-            return h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
         }
-
-        function optimizeShift(anchorTime, newTime, isSettingStart) {
-            let [ah, am] = anchorTime.split(':').map(Number);
-            let [nh, nm] = newTime.split(':').map(Number);
-            let anchorMins = ah * 60 + am;
-            let opt1Mins = nh * 60 + nm;
-            let opt2Mins = (nh < 12 ? nh + 12 : nh - 12) * 60 + nm; 
-            
-            let dur1 = isSettingStart ? anchorMins - opt1Mins : opt1Mins - anchorMins;
-            if (dur1 < 0) dur1 += 1440; 
-            let dur2 = isSettingStart ? anchorMins - opt2Mins : opt2Mins - anchorMins;
-            if (dur2 < 0) dur2 += 1440;
-
-            if (dur2 < 840 && dur2 < dur1) {
-                let bestH = Math.floor(opt2Mins / 60);
-                return bestH.toString().padStart(2, '0') + ":" + nm.toString().padStart(2, '0');
-            }
-            return newTime;
-        }
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            const monthMap = {"january": 0, "february": 1, "march": 2, "april": 3, "may": 4, "june": 5, "july": 6, "august": 7, "september": 8, "october": 9, "november": 10, "december": 11};
-            const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-
-            document.getElementById('mic-btn').onclick = () => { 
-                recognition.start(); 
-                notification("🎤 Listening...", "#28a745");
-            };
-            
-            recognition.onresult = (event) => {
-                const speech = event.results[0][0].transcript.toLowerCase();
-                const dateField = document.getElementById('date');
-                const hasExplicitAMPM = /am|a\.m\.|pm|p\.m\.|morning|night|evening|afternoon/.test(speech);
-
-                let targetDate = new Date();
-                let dateFound = false;
-
-                if (speech.includes("yesterday")) {
-                    targetDate.setDate(targetDate.getDate() - 1);
-                    dateFound = true;
-                } else {
-                    const monthMatch = speech.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})/);
-                    const dayMatch = speech.match(/(?:on )?(?:the )?(\d{1,2})(?:st|nd|rd|th)/) || speech.match(/on the (\d{1,2})/);
-                    const weekdayMatch = speech.match(/(last\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/);
-
-                    if (monthMatch) {
-                        targetDate.setMonth(monthMap[monthMatch[1]]);
-                        targetDate.setDate(parseInt(monthMatch[2]));
-                        dateFound = true;
-                    } else if (weekdayMatch) {
-                        let spokenDay = daysOfWeek.indexOf(weekdayMatch[2]);
-                        let daysAgo = targetDate.getDay() - spokenDay;
-                        if (daysAgo <= 0) daysAgo += 7;
-                        if (weekdayMatch[1] && daysAgo < targetDate.getDay()) daysAgo += 7;
-                        targetDate.setDate(targetDate.getDate() - daysAgo);
-                        dateFound = true;
-                    } else if (dayMatch) {
-                        targetDate.setDate(parseInt(dayMatch[1]));
-                        dateFound = true;
-                    } else if (speech.includes("today")) dateFound = true;
-                }
-                
-                if (dateFound || !dateField.value) {
-                    const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}`;
-                    selectCalendarDate(dateStr);
-                }
-
-                let handledAsRange = false;
-                if (!speech.includes("change")) {
-                    const rangeMatch = speech.match(/(?:from\s+)?(.*?)\s+(?:to|until|till|through)\s+(.*)/);
-                    if (rangeMatch) {
-                        const startT = parseVoiceTime(rangeMatch[1], true);
-                        const endT = parseVoiceTime(rangeMatch[2], true);
-                        if (startT && endT) {
-                            document.getElementById('start-time').value = startT;
-                            document.getElementById('end-time').value = endT;
-                            notification("✅ Range Set");
-                            handledAsRange = true;
-                        }
-                    }
-                }
-
-                if (!handledAsRange) {
-                    const isStart = /started|start|clock in|got to work/.test(speech) || (speech.includes("change") && speech.includes("start"));
-                    const isEnd = /left|end|finished|clock out/.test(speech) || (speech.includes("change") && speech.includes("end"));
-                    const time = parseVoiceTime(speech, false);
-                    let finalTime = time || (() => {
-                        const now = new Date();
-                        let min = Math.round(now.getMinutes() / 5) * 5;
-                        let hr = now.getHours();
-                        if(min===60) { min=0; hr++; }
-                        return hr.toString().padStart(2, '0') + ":" + min.toString().padStart(2, '0');
-                    })();
-
-                    if (isStart) {
-                        let currentEnd = document.getElementById('end-time').value;
-                        if (currentEnd && !hasExplicitAMPM) finalTime = optimizeShift(currentEnd, finalTime, true);
-                        document.getElementById('start-time').value = finalTime;
-                        notification("✅ Start: " + format12h(finalTime));
-                    } else if (isEnd) {
-                        let currentStart = document.getElementById('start-time').value;
-                        if (currentStart && !hasExplicitAMPM) finalTime = optimizeShift(currentStart, finalTime, false);
-                        document.getElementById('end-time').value = finalTime;
-                        notification("✅ End: " + format12h(finalTime));
-                    }
-                }
-                updateLiveCalc();
-            };
-        }
-
-        // --- DATA & CALENDAR HANDLERS ---
-        document.getElementById('date').onchange = function() {
-            loadDateData(this.value);
-            renderCalendar();
-        };
-
-        function loadDateData(dateStr) {
-            let history = JSON.parse(localStorage.getItem('rushTimesheet')) || {};
-            let entry = history[dateStr];
-            if (entry) {
-                document.getElementById('start-time').value = entry.start || "";
-                document.getElementById('end-time').value = entry.end || "";
-                document.getElementById('pay-type').value = entry.type || "Regular";
-            } else {
-                document.getElementById('start-time').value = "";
-                document.getElementById('end-time').value = "";
-                document.getElementById('pay-type').value = "Regular";
-            }
-            updateLiveCalc();
-        }
-
-        document.getElementById('clear-btn').onclick = () => {
-            document.getElementById('start-time').value = "";
-            document.getElementById('end-time').value = "";
-            document.getElementById('date').value = "";
-            document.getElementById('pay-type').value = "Regular";
-            updateLiveCalc();
-            renderCalendar();
-        };
-
-        document.getElementById("add-btn").onclick = async () => {
-            const d = document.getElementById("date").value;
-            const s = document.getElementById("start-time").value;
-            const e = document.getElementById("end-time").value;
-            const pt = document.getElementById("pay-type").value;
-            const tot = updateLiveCalc();
-
-            if (!d) return alert("Please select a Date first.");
-
-            let history = JSON.parse(localStorage.getItem('rushTimesheet')) || {};
-            history[d] = { start: s, end: e, type: pt, total: tot };
-            localStorage.setItem('rushTimesheet', JSON.stringify(history));
-            renderCalendar();
-
-            try {
-                notification("☁️ Syncing time...", "#007bff");
-                await fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ action: "save", date: d, start: s, end: e, type: pt, total: tot })
-                });
-                notification("✅ Time Logged in Drive!");
-            } catch (err) {
-                notification("⚠️ Saved locally (Offline)", "#e67e22");
-            }
-        };
-
-        document.getElementById("auth-btn").onclick = async () => {
-            const dateVal = document.getElementById("date").value;
-            if (!dateVal) return alert("Please select a date on the calendar first.");
-
-            const [yy, mm, dd] = dateVal.split('-');
-            const yearNum = parseInt(yy);
-            const monthNum = parseInt(mm);
-            const periodString = parseInt(dd) <= 15 ? "1st - 15th" : "16th - End";
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            const monthName = monthNames[monthNum - 1];
-
-            if (!confirm(`Finalize ${monthName} ${yearNum} (${periodString})?\nThis saves the PDF to your Payroll folder.`)) return;
-
-            try {
-                notification("⚙️ Generating PDF...", "#8e44ad");
-                await fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ action: "authorize", monthNum, yearNum, periodString, monthName })
-                });
-                setTimeout(() => notification("✅ PDF Saved to Drive!"), 1500);
-            } catch (err) {
-                notification("⚠️ Error generating PDF", "#dc3545");
-            }
-        };
-
-        function renderCalendar() {
-            const grid = document.getElementById('calendar-grid');
-            const monthLabel = document.getElementById('current-month');
-            const history = JSON.parse(localStorage.getItem('rushTimesheet')) || {};
-            const selectedDate = document.getElementById('date').value;
-
-            grid.innerHTML = "";
-            const year = currentViewDate.getFullYear();
-            const month = currentViewDate.getMonth();
-            monthLabel.innerText = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(currentViewDate);
-
-            ['S','M','T','W','T','F','S'].forEach(day => grid.innerHTML += `<div class="day-header">${day}</div>`);
-            const firstDay = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-            for (let i = 0; i < firstDay; i++) grid.innerHTML += '<div></div>';
-            for (let day = 1; day <= daysInMonth; day++) {
-                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                grid.innerHTML += `<div class="calendar-day ${dateKey === selectedDate ? 'selected-day' : ''} ${history[dateKey] ? 'has-data' : ''}" onclick="selectCalendarDate('${dateKey}')">${day}</div>`;
-            }
-        }
-
-        function selectCalendarDate(dateStr) {
-            document.getElementById('date').value = dateStr;
-            loadDateData(dateStr);
-            renderCalendar();
-        }
-
-        function changeMonth(dir) {
-            currentViewDate.setMonth(currentViewDate.getMonth() + dir);
-            renderCalendar();
-        }
-
-        renderCalendar();
     </script>
+    <script src="app.js"></script>
 </body>
 </html>
