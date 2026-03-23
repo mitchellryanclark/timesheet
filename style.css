@@ -34,7 +34,7 @@ body {
     font-weight: 600;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .card {
@@ -45,10 +45,11 @@ body {
     border-radius: 20px;
     box-shadow: var(--shadow);
     margin-bottom: 24px;
-    border: 1px solid rgba(255,255,255,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-h2, h3 {
+h2,
+h3 {
     margin-top: 0;
     color: #1a202c;
     font-weight: 700;
@@ -79,10 +80,27 @@ h2, h3 {
     transform: scale(0.98);
 }
 
-#mic-btn { background-color: var(--primary); color: white; }
-#add-btn { background-color: var(--secondary); color: white; }
-#clear-btn { background-color: #cbd5e0; color: #4a5568; margin-bottom: 0; }
-#auth-btn { background-color: var(--accent); color: white; border: none; }
+#mic-btn {
+    background-color: var(--primary);
+    color: white;
+}
+
+#add-btn {
+    background-color: var(--secondary);
+    color: white;
+}
+
+#clear-btn {
+    background-color: #cbd5e0;
+    color: #4a5568;
+    margin-bottom: 0;
+}
+
+#auth-btn {
+    background-color: var(--accent);
+    color: white;
+    border: none;
+}
 
 label {
     font-size: 13px;
@@ -94,7 +112,8 @@ label {
     letter-spacing: 0.5px;
 }
 
-input, select {
+input,
+select {
     width: 100%;
     padding: 12px;
     margin-bottom: 16px;
@@ -106,7 +125,8 @@ input, select {
     transition: border-color 0.2s;
 }
 
-input:focus, select:focus {
+input:focus,
+select:focus {
     outline: none;
     border-color: var(--secondary);
     box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
@@ -160,7 +180,7 @@ input:focus, select:focus {
     padding: 12px 0;
     text-align: center;
     background: #fff;
-    border: 1px solid rgba(0,0,0,0.03);
+    border: 1px solid rgba(0, 0, 0, 0.03);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
@@ -190,7 +210,7 @@ input:focus, select:focus {
     background: var(--secondary) !important;
     color: white !important;
     font-weight: 700;
-    box-shadow: 0 4px 10px rgba(0,123,255,0.3);
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3);
 }
 
 .day-header {
