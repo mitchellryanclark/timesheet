@@ -504,3 +504,25 @@ function changeMonth(dir) {
 
 // Initial render
 renderCalendar();
+
+async function syncFromGoogle() {
+    try {
+        notification("🔄 Syncing from Google...", "#007bff");
+        const res = await fetch(GOOGLE_SCRIPT_URL + "?action=get_dates");
+        const serverHistory = await res.json();
+        
+        if (serverHistory && Object.keys(serverHistory).length > 0) {
+            localStorage.setItem('rushTimesheet', JSON.stringify(serverHistory));
+            renderCalendar();
+            
+            // If the user currently has a date selected, refresh its data in the inputs!
+            if (document.getElementById('date').value) {
+                loadDateData(document.getElementById('date').value);
+            }
+        }
+    } catch (e) {
+        console.error("Master Sync failed", e);
+    }
+}
+
+window.addEventListener('load', syncFromGoogle);
