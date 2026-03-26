@@ -4,21 +4,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rush Timesheet</title>
+    <title>TimeTrack Pro</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2091/2091665.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#28a745">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
 
     <div id="notification-bar">Syncing...</div>
 
+    <!-- ⚙️ SETTINGS MODAL -->
+    <div id="settings-overlay" class="settings-overlay hidden">
+        <div class="settings-modal">
+            <div class="settings-header">
+                <h2>⚙️ Profile & Settings</h2>
+                <button id="close-settings-btn" class="close-btn">✕</button>
+            </div>
+
+            <div class="settings-section">
+                <h4>👤 Your Information</h4>
+                <label>Your Full Name</label>
+                <input type="text" id="s-userName" placeholder="e.g. Mitchell R Clark">
+            </div>
+
+            <div class="settings-section">
+                <h4>🏢 Employer</h4>
+                <label>Employer Name</label>
+                <input type="text" id="s-employerName" placeholder="e.g. Rush Process Service">
+                <label>Employer Email</label>
+                <input type="email" id="s-employerEmail" placeholder="e.g. contact@employer.com">
+            </div>
+
+            <div class="settings-section">
+                <h4>💰 Pay Details</h4>
+                <label>Hourly Rate ($)</label>
+                <input type="number" id="s-hourlyRate" placeholder="e.g. 26" step="0.25">
+                <label>Pay Period Type</label>
+                <select id="s-payPeriod">
+                    <option value="1st-15th">Semi-Monthly (1st–15th)</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Bi-weekly">Bi-weekly</option>
+                </select>
+                <label>Pay Date Rule</label>
+                <select id="s-payDateType">
+                    <option value="static">Fixed day of month (e.g. every 5th)</option>
+                    <option value="offset">Days after period ends (e.g. 5 days later)</option>
+                </select>
+                <label id="s-payDateVal-label">Day of month you receive pay</label>
+                <input type="number" id="s-payDateVal" placeholder="e.g. 5" min="1" max="31">
+            </div>
+
+            <div class="settings-section">
+                <h4>📧 Sync Settings</h4>
+                <label>Your Review Email</label>
+                <input type="email" id="s-syncEmail" placeholder="e.g. yourname@gmail.com">
+                <label>Invoice Format</label>
+                <select id="s-pdfFormat">
+                    <option value="calendar">📅 Calendar Grid (Visual)</option>
+                    <option value="list">📋 Classic List View</option>
+                </select>
+                <div class="toggle-row">
+                    <label>Enable Google Drive Sync</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="s-syncEnabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <button id="save-settings-btn" class="btn-main btn-save">💾 Save Profile</button>
+            <p class="settings-hint">v2.0 – Universal App</p>
+        </div>
+    </div>
+
+    <!-- MAIN APP CARD -->
     <div class="card">
-        <h2>Rush Timesheet</h2>
+        <div class="app-header">
+            <h2 id="app-title">TimeTrack Pro</h2>
+            <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+        </div>
         <button id="mic-btn" class="btn-main">🎤 Tap to Speak</button>
 
         <label>Date:</label>
@@ -37,9 +107,7 @@
 
         <label>Lunch Deduction (Hours):</label>
         <input type="number" id="lunch-break" step="0.25" value="0" placeholder="e.g. 0.5">
-        <small
-            style="display: block; margin-top: -12px; margin-bottom: 12px; font-size: 11px; color: var(--text-muted);">0.5
-            = 30m, 0.75 = 45m</small>
+        <small style="display: block; margin-top: -12px; margin-bottom: 12px; font-size: 11px; color: var(--text-muted);">0.5 = 30m, 0.75 = 45m</small>
 
         <div id="auto-calc-display" class="time-box">Total: 0.00 hours</div>
         <br>
@@ -49,7 +117,7 @@
             <option value="Regular">Regular</option>
             <option value="Vacay Pay">Vacay Pay</option>
             <option value="Holiday Pay">Holiday Pay</option>
-            <option value="Sick Day">Sick Day</option>
+            <option value="Sick Pay">Sick Pay</option>
         </select>
 
         <button id="add-btn" class="btn-main">Save & Sync to Drive</button>
@@ -68,12 +136,42 @@
 
     <div class="card" style="border-left: 5px solid #8e44ad;">
         <h3>Finalize Invoice</h3>
-        <p class="helper-text">Select a date on the calendar, then tap Authorize to generate the PDF for that pay
-            period.</p>
+        <p class="helper-text">Select a date on the calendar, then tap Authorize to generate the invoice for that pay period.</p>
         <div style="display: flex; gap: 10px; flex-direction: column;">
             <button id="auth-btn" class="btn-main">📑 1. Generate & Review</button>
-            <button id="send-employer-btn" class="btn-main" style="background-color: #d35400;">📤 2. Approve & Send to
-                Employer</button>
+            <button id="preview-pdf-btn" class="btn-main" style="background-color: #16a085;">👁️ Preview Calendar PDF</button>
+            <button id="send-employer-btn" class="btn-main" style="background-color: #d35400;">📤 2. Approve & Send to Employer</button>
+        </div>
+    </div>
+
+    <!-- 🖨️ HIDDEN CALENDAR PDF TEMPLATE -->
+    <div id="pdf-preview-overlay" class="pdf-overlay hidden">
+        <div class="pdf-controls">
+            <button id="print-pdf-btn" class="btn-main" style="max-width:200px;">🖨️ Print / Save PDF</button>
+            <button id="close-pdf-btn" class="btn-main" style="max-width:200px; background:#888;">✕ Close</button>
+        </div>
+        <div id="pdf-calendar-container" class="pdf-calendar">
+            <div class="pdf-header">
+                <div class="pdf-header-left">
+                    <div id="pdf-user-name" class="pdf-name"></div>
+                    <div id="pdf-employer-name" class="pdf-employer"></div>
+                </div>
+                <div class="pdf-header-right">
+                    <div id="pdf-period-label" class="pdf-period"></div>
+                    <div id="pdf-rate-label" class="pdf-rate"></div>
+                </div>
+            </div>
+            <h1 id="pdf-month-title" class="pdf-month-title"></h1>
+            <table id="pdf-grid" class="pdf-grid">
+                <thead>
+                    <tr>
+                        <th>Sunday</th><th>Monday</th><th>Tuesday</th><th>Wednesday</th>
+                        <th>Thursday</th><th>Friday</th><th>Saturday</th>
+                    </tr>
+                </thead>
+                <tbody id="pdf-grid-body"></tbody>
+            </table>
+            <div id="pdf-footer" class="pdf-footer"></div>
         </div>
     </div>
 

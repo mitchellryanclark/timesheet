@@ -1,5 +1,30 @@
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNB-c_Zm9M8Y4VY4ik5y4WEazBugZVUZH2grDrjzoKBVQqiFxOYTudbM7z3km0FRxQ/exec";
 
+// --- UNIVERSAL PROFILE & SETTINGS ---
+const DEFAULT_PROFILE = {
+    userName: "Mitchell R Clark",
+    employerName: "Rush Process Service",
+    employerEmail: "contact@rushprocessservice.com",
+    syncEmail: "mellobluedevil@gmail.com",
+    hourlyRate: 26,
+    payPeriod: "1st-15th", // Options: 1st-15th, Weekly, Bi-weekly
+    payDateType: "static", // Options: static, offset
+    payDateVal: 5,        // Day of month or number of days offset
+    pdfFormat: "calendar", // Options: calendar, list
+    syncEnabled: true
+};
+
+function getProfile() {
+    const stored = localStorage.getItem('rushProfile');
+    return stored ? JSON.parse(stored) : DEFAULT_PROFILE;
+}
+
+function saveProfile(profile) {
+    localStorage.setItem('rushProfile', JSON.stringify(profile));
+    notification("✅ Profile Saved!");
+    location.reload(); // Refresh to apply all changes
+}
+
 let currentViewDate = new Date();
 
 // --- PUSH NOTIFICATIONS & OFFLINE ---
@@ -357,6 +382,7 @@ document.getElementById("add-btn").onclick = async () => {
         notification("✅ Correction Saved!");
         sendPushNotification("✅ Correction Applied", `Successfully updated your hours for ${d}.`);
     } else {
+        const prof = getProfile();
         notification("✅ Time Logged!");
         sendPushNotification("✅ Hours Logged", `Successfully logged ${tot} hours for ${d}.`);
     }
@@ -393,7 +419,8 @@ document.getElementById("auth-btn").onclick = async () => {
     let endDDay = isFirstPeriod ? '15' : new Date(yearNum, monthNum, 0).getDate();
     let endD = `${String(monthNum).padStart(2, '0')}/${endDDay}/${yearNum}`;
 
-    if (!confirm(`Finalize ${monthName} ${periodString}?\nPay Date will be: ${payDateString}`)) return;
+    const prof = getProfile();
+    if (!confirm(`Finalize ${monthName} ${periodString} for ${prof.employerName}?\nPay Date will be: ${payDateString}`)) return;
 
     notification("⚙️ Generating Summary...", "#8e44ad");
     await fetch(GOOGLE_SCRIPT_URL, {
@@ -405,8 +432,8 @@ document.getElementById("auth-btn").onclick = async () => {
             payDate: payDateString,
             startDate: startD,
             endDate: endD,
-            reviewEmail: "mellobluedevil@gmail.com",
-            employerEmail: "contact@rushprocessservice.com"
+            reviewEmail: prof.syncEmail,
+            employerEmail: prof.employerEmail
         })
     });
 
@@ -434,7 +461,8 @@ document.getElementById("send-employer-btn").onclick = async () => {
         return;
     }
 
-    if (!confirm(`Are you sure you want to send the finalized invoice to your employer (contact@rushprocessservice.com)?`)) return;
+    const prof = getProfile();
+    if (!confirm(`Are you sure you want to send the finalized invoice to your employer (${prof.employerEmail})?`)) return;
 
     const periodString = isFirstPeriod ? "1st - 15th" : "16th - End";
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -460,7 +488,7 @@ document.getElementById("send-employer-btn").onclick = async () => {
             payDate: payDateString,
             startDate: startD,
             endDate: endD,
-            employerEmail: "contact@rushprocessservice.com"
+            employerEmail: prof.employerEmail
         })
     });
 
@@ -525,4 +553,124 @@ async function syncFromGoogle() {
     }
 }
 
-window.addEventListener('load', syncFromGoogle);
+window.addEventListener('load', () => {
+    syncFromGoogle();
+    initProfileUI();
+});
+
+// --- SETTINGS UI ---
+function initProfileUI() {
+    const prof = getProfile();
+    const title = document.getElementById('app-title');
+    if (title && prof.userName) title.textContent = prof.userName + "'s Timesheet";
+}
+
+function openSettings() {
+    const prof = getProfile();
+    document.getElementById('s-userName').value = prof.userName || '';
+    document.getElementById('s-employerName').value = prof.employerName || '';
+    document.getElementById('s-employerEmail').value = prof.employerEmail || '';
+    document.getElementById('s-syncEmail').value = prof.syncEmail || '';
+    document.getElementById('s-hourlyRate').value = prof.hourlyRate || '';
+    document.getElementById('s-payPeriod').value = prof.payPeriod || '1st-15th';
+    document.getElementById('s-payDateType').value = prof.payDateType || 'static';
+    document.getElementById('s-payDateVal').value = prof.payDateVal || 5;
+    document.getElementById('s-pdfFormat').value = prof.pdfFormat || 'calendar';
+    document.getElementById('s-syncEnabled').checked = prof.syncEnabled !== false;
+    updatePayDateLabel();
+    document.getElementById('settings-overlay').classList.remove('hidden');
+}
+
+function updatePayDateLabel() {
+    const type = document.getElementById('s-payDateType').value;
+    const lbl = document.getElementById('s-payDateVal-label');
+    lbl.textContent = type === 'static' ? 'Day of month you receive pay (e.g. 5 = the 5th)' : 'Days after period ends until pay (e.g. 5)';
+}
+
+document.getElementById('settings-btn').onclick = openSettings;
+document.getElementById('close-settings-btn').onclick = () => document.getElementById('settings-overlay').classList.add('hidden');
+document.getElementById('s-payDateType').onchange = updatePayDateLabel;
+
+document.getElementById('save-settings-btn').onclick = () => {
+    const profile = {
+        userName: document.getElementById('s-userName').value.trim(),
+        employerName: document.getElementById('s-employerName').value.trim(),
+        employerEmail: document.getElementById('s-employerEmail').value.trim(),
+        syncEmail: document.getElementById('s-syncEmail').value.trim(),
+        hourlyRate: parseFloat(document.getElementById('s-hourlyRate').value) || 26,
+        payPeriod: document.getElementById('s-payPeriod').value,
+        payDateType: document.getElementById('s-payDateType').value,
+        payDateVal: parseInt(document.getElementById('s-payDateVal').value) || 5,
+        pdfFormat: document.getElementById('s-pdfFormat').value,
+        syncEnabled: document.getElementById('s-syncEnabled').checked
+    };
+    saveProfile(profile);
+};
+
+// --- CALENDAR PDF GENERATOR ---
+function format12hSimple(t) {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ampm}`;
+}
+
+function buildCalendarPDF(year, month) {
+    const prof = getProfile();
+    const history = JSON.parse(localStorage.getItem('rushTimesheet')) || {};
+    const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+    document.getElementById('pdf-user-name').textContent = prof.userName || 'Employee';
+    document.getElementById('pdf-employer-name').textContent = prof.employerName || 'Employer';
+    document.getElementById('pdf-month-title').textContent = `${monthNames[month]} ${year}`;
+    document.getElementById('pdf-period-label').textContent = `Pay Rate: $${prof.hourlyRate}/hr`;
+    document.getElementById('pdf-rate-label').textContent = `Period: ${prof.payPeriod}`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const tbody = document.getElementById('pdf-grid-body');
+    tbody.innerHTML = '';
+
+    let cells = [];
+    for (let i = 0; i < firstDay; i++) cells.push('<td></td>');
+
+    let totalHours1 = 0, totalHours2 = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const entry = history[key];
+        let cellContent = `<span class="pdf-day-num">${day}</span>`;
+        if (entry && entry.start) {
+            const shift = `${format12hSimple(entry.start)}-${format12hSimple(entry.end)}`;
+            const hrs = parseFloat(entry.total) || 0;
+            if (day <= 15) totalHours1 += hrs; else totalHours2 += hrs;
+            const isSpecial = entry.type && entry.type !== 'Regular';
+            cellContent += `<div class="pdf-shift">${shift}</div>`;
+            cellContent += `<div class="pdf-hours">${hrs.toFixed(2)}</div>`;
+            if (isSpecial) cellContent += `<div class="pdf-pay-type">${entry.type}</div>`;
+        }
+        cells.push(`<td>${cellContent}</td>`);
+    }
+    while (cells.length % 7 !== 0) cells.push('<td></td>');
+
+    for (let r = 0; r < cells.length; r += 7) {
+        const row = document.createElement('tr');
+        row.innerHTML = cells.slice(r, r + 7).join('');
+        tbody.appendChild(row);
+    }
+
+    const rate = prof.hourlyRate || 26;
+    const footer = document.getElementById('pdf-footer');
+    footer.innerHTML = `
+        <div class="pdf-footer-row"><span>1st – 15th: <strong>${totalHours1.toFixed(2)} hrs</strong></span><span>× $${rate}/hr = <strong>$${(totalHours1 * rate).toFixed(2)}</strong></span></div>
+        <div class="pdf-footer-row"><span>16th – End: <strong>${totalHours2.toFixed(2)} hrs</strong></span><span>× $${rate}/hr = <strong>$${(totalHours2 * rate).toFixed(2)}</strong></span></div>
+        <div class="pdf-footer-row" style="border-top:1px solid #ccc;margin-top:6px;padding-top:6px;font-weight:bold;"><span>Total Month: ${(totalHours1 + totalHours2).toFixed(2)} hrs</span><span>Total: $${((totalHours1 + totalHours2) * rate).toFixed(2)}</span></div>
+    `;
+}
+
+document.getElementById('preview-pdf-btn').onclick = () => {
+    buildCalendarPDF(currentViewDate.getFullYear(), currentViewDate.getMonth());
+    document.getElementById('pdf-preview-overlay').classList.remove('hidden');
+};
+document.getElementById('close-pdf-btn').onclick = () => document.getElementById('pdf-preview-overlay').classList.add('hidden');
+document.getElementById('print-pdf-btn').onclick = () => window.print();
