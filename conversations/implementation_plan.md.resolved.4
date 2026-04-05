@@ -1,0 +1,33 @@
+# Universal Configurable Timesheet App (v2)
+
+The goal is to move from a "Mitchell-only" app to a **Generic Platform** where all user and employer variables are configurable. Use the existing repository but refactor the code to remove all hardcoded personal strings.
+
+## 🏗️ Universal Architecture
+
+Instead of hardcoding details, the app will rely on a `user_profile` stored in `localStorage`.
+
+### ⚙️ The "User Profile" Settings
+- **User Name**: Replaces "Mitchell R Clark".
+- **Employer Name**: Replaces any hardcoded employer references.
+- **Hourly Rate**: Configurable (e.g., $26/hr).
+- **Employer Email**: Replaces `contact@rushprocessservice.com`.
+- **User Email (Sync)**: Replaces `mellobluedevil@gmail.com`.
+
+## 🗓️ Universal Calendar PDF
+
+The local PDF engine will populate a **Traditional 7-Column Calendar** using the data from the **User Profile**.
+
+1. **Header**: Dynamically displays `Month/Year`, `User Name`, and `Employer Name`.
+2. **Body**: 12hr format shift times and daily totals.
+3. **Footer**: Pay period subtotals based on the Profile's Hourly Rate.
+
+## 🛠️ Proposed Changes
+
+1. **[CORE] Variable Refactor**: Scan [app.js](file:///d:/AI%20Coding%20Projects/AntigravityTimesheetApp/app.js) and replace all hardcoded strings with variables from `localStorage`.
+2. **[UI] Settings Menu**: Create a screen for users to enter their Name, Employer, Rate, and Emails.
+3. **[PDF] Local Engine**: Implement the calendar-style grid PDF using these variables.
+4. **[SYNC] Pro Module**: Maintain the current Drive Sync as an optional feature.
+
+## 🧪 Testing Plan
+- **Migration**: Ensure Mitchell's data transitions smoothly into the new Settings fields.
+- **Flexibility**: Change settings and verify the UI and PDF update instantly.

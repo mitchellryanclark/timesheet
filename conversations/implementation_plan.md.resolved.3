@@ -1,0 +1,53 @@
+# Git Branching & Timesheet App Updates
+
+This plan covers the transition to a branching workflow and the implementation of the first set of updates from the user's task list.
+
+## 🌳 Git Branching Workflow
+
+We will move away from committing directly to `main`. Instead, we'll use a feature-branch approach.
+
+1.  **Create Branch**: `git checkout -b updates-v2`
+2.  **Develop**: Make changes to the code in this branch.
+3.  **Local Test**: Open the local [index.html](file:///d:/AI%20Coding%20Projects/AntigravityTimesheetApp/index.html) (or use a local server) to verify changes on your computer.
+4.  **Mobile Test**: 
+    - We will look into [Firebase Hosting Preview Channels](https://firebase.google.com/docs/hosting/test-preview-deploy) if the app is hosted on Firebase.
+    - Alternatively, we can use a local IP address to test on your phone over Wi-Fi.
+5.  **GitHub Push**: `git push origin updates-v2` (keeps the work backed up in the cloud).
+6.  **Merge**: Once all 15 tasks (or a logical subset) are done and tested, we'll merge `updates-v2` back into `main`.
+
+## 🗓️ Calendar-Style PDF Invoice (v2)
+
+### 🏗️ Proposed Architecture
+We will implement **Local PDF Generation** for exact layout control.
+1.  **Print View**: A hidden HTML template mirroring the manual calendar (7 columns).
+2.  **Data Injection**: Each date box will show `Start-End` and `Total Hours`.
+3.  **Totals**: Automatic calculation for the two pay periods (1-15, 16-End) using the updated **$26/hr** rate.
+4.  **Export**: Use a client-side library to generate a perfect PDF copy.
+
+## ⚙️ Settings: One App, Multi-User Vision
+
+Instead of two separate apps, we will build a **single, intelligent app** that adapts to the user.
+
+1.  **Local-Only Mode**: No accounts needed. Data is stored purely on the phone. This is for users who just want to track their own hours privately.
+2.  **Pro-Sync Mode**: When a user connects their Google account, the app unlocks the automated Drive sync and Email features you currently enjoy.
+
+### 🛠️ Configurable Variables (The Settings Menu)
+- [ ] **Current Pay Rate**: Default to **$26/hr**, user-editable.
+- [ ] **Your Name**: To personalize the header of the Invoice (e.g., replaces "Mitchell R Clark").
+- [ ] **Employer Email**: Set the recipient for the finalized timesheets.
+- [ ] **Pay Periods**: Switch between 1st-15th or standard weekly/bi-weekly cycles.
+- [ ] **12hr/24hr Toggle**: Especially for the **sync_data** file (to satisfy Task #1).
+
+## 🛠️ Proposed Changes (Revised Order)
+
+1.  **[CORE] $26 Rate Update**: Immediate correction in math logic.
+2.  **[CORE] 12hr Sync Data**: Modify the data packet sent to Google Scripts (Task #1).
+3.  **[PDF] Calendar Grid**: Implement the new grid-based print layout.
+4.  **[UI] Settings Menu**: Create the interface for personalizing the app.
+
+## 🧪 Testing Plan
+
+### Manual Verification
+- **Calendar Preview**: Add a "Preview" button to see the grid before generating the PDF.
+- **Mobile Check**: Test the preview on your phone using the local IP address.
+- **Accuracy**: Compare the generated grid values against the hand-written reference photo.

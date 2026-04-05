@@ -1,0 +1,44 @@
+# Git Branching & Timesheet App Updates
+
+This plan covers the transition to a branching workflow and the implementation of the first set of updates from the user's task list.
+
+## 🌳 Git Branching Workflow
+
+We will move away from committing directly to `main`. Instead, we'll use a feature-branch approach.
+
+1.  **Create Branch**: `git checkout -b updates-v2`
+2.  **Develop**: Make changes to the code in this branch.
+3.  **Local Test**: Open the local [index.html](file:///d:/AI%20Coding%20Projects/AntigravityTimesheetApp/index.html) (or use a local server) to verify changes on your computer.
+4.  **Mobile Test**: 
+    - We will look into [Firebase Hosting Preview Channels](https://firebase.google.com/docs/hosting/test-preview-deploy) if the app is hosted on Firebase.
+    - Alternatively, we can use a local IP address to test on your phone over Wi-Fi.
+5.  **GitHub Push**: `git push origin updates-v2` (keeps the work backed up in the cloud).
+6.  **Merge**: Once all 15 tasks (or a logical subset) are done and tested, we'll merge `updates-v2` back into `main`.
+
+## 🗓️ Calendar-Style PDF Invoice
+
+The major shift is moving from a list-based PDF to a **Traditional Calendar Grid** (matching the provided photo).
+
+### 🏗️ Proposed Architecture
+Instead of relying on a hidden Google Script to generate the PDF, we will implement **Local PDF Generation** (Client-Side).
+1.  **Print View**: Create a hidden HTML template that mirrors the manual calendar (7 columns, large boxes).
+2.  **Data Injection**: Fill each date box with `Start-End` and `Total Hours` from `localStorage`.
+3.  **Totals**: Calculate and display the two pay period subtotals (1-15 and 16-End) at the bottom.
+4.  **Export**: Use `jsPDF` + `html2canvas` (or a high-quality `@media print` style) to generate the file.
+
+> [!TIP]
+> This approach allows you to see a **live preview** on your phone before you even "Generate" it, making verification much easier.
+
+## 🛠️ Proposed Changes
+
+1.  **[UPDATE] PDF Engine**: Switch to a client-side library for exact layout control.
+2.  **[NEW] Grid Component**: Design the printable calendar component in [index.html](file:///d:/AI%20Coding%20Projects/AntigravityTimesheetApp/index.html).
+3.  **[UPDATE] Task #1**: Ensure 12hr format is used in the grid cells.
+4.  **[NEW] Footer Logic**: Automatic calculation of the $25/hr rate and totals for the two halves of the month.
+
+## 🧪 Testing Plan
+
+### Manual Verification
+- **Calendar Preview**: Add a "Preview" button to see the grid before generating the PDF.
+- **Mobile Check**: Test the preview on your phone using the local IP address.
+- **Accuracy**: Compare the generated grid values against the hand-written reference photo.

@@ -1,0 +1,37 @@
+# Git Branching & Timesheet App Updates
+
+This plan covers the transition to a branching workflow and the implementation of the first set of updates from the user's task list.
+
+## 🌳 Git Branching Workflow
+
+We will move away from committing directly to `main`. Instead, we'll use a feature-branch approach.
+
+1.  **Create Branch**: `git checkout -b updates-v2`
+2.  **Develop**: Make changes to the code in this branch.
+3.  **Local Test**: Open the local `index.html` (or use a local server) to verify changes on your computer.
+4.  **Mobile Test**: 
+    - We will look into [Firebase Hosting Preview Channels](https://firebase.google.com/docs/hosting/test-preview-deploy) if the app is hosted on Firebase.
+    - Alternatively, we can use a local IP address to test on your phone over Wi-Fi.
+5.  **GitHub Push**: `git push origin updates-v2` (keeps the work backed up in the cloud).
+6.  **Merge**: Once all 15 tasks (or a logical subset) are done and tested, we'll merge `updates-v2` back into `main`.
+
+## 🧪 Testing Plan
+
+### Automated Tests
+- N/A (Standard web app testing using the browser tool for UI checks).
+
+### Manual Verification
+- **Local Browser**: Refresh `index.html` after ஒவ்வொரு change.
+- **Mobile Check**: Access via local IP or Firebase Preview URL.
+- **Offline Test**: Task #7 ("run test entering data offline") will require disabling the network in the browser dev tools.
+
+## 🛠️ Proposed Changes (Initial Batch)
+
+We will start with the first few visual and data-sync adjustments:
+- [ ] Task #1: 12hr time format in sync data.
+- [ ] Task #2: Change pay date/period font size to 18pts.
+- [ ] Task #3: Define a visible grid.
+- [ ] Task #4: Reduce rows from 39 to a smaller number.
+
+> [!NOTE]
+> We will create the `updates-v2` branch first before making any of these changes.

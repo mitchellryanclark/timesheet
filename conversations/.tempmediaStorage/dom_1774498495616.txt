@@ -1,0 +1,144 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+Save & Sync to Drive
+Clear Screen
+History Calendar
+‹
+March 2026
+›
+S
+M
+T
+W
+T
+F
+S
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+Finalize Invoice
+Select a date on the calendar, then tap Authorize to generate the invoice for that pay period.
+📑 1. Generate & Review
+👁️ Preview Calendar PDF
+📤 2. Approve & Send to Employer
+[0] (387,45)<button class='btn-main' id='print-pdf-btn'>🖨️ Print / Save PDF />
+[1] (613,45)<button class='btn-main' id='close-pdf-btn'>✕ Close />
+Mitchell R Clark
+Rush Process Service
+Pay Rate: $26/hr
+Period: 1st-15th
+March 2026
+Sunday
+Monday
+Tuesday
+Wednesday
+Thursday
+Friday
+Saturday
+1
+2
+9:15AM-6:10PM
+8.92
+3
+10:40AM-6:00PM
+7.33
+4
+9:00AM-6:00PM
+9.00
+5
+9:00AM-5:55PM
+8.92
+6
+10:00AM-6:20PM
+8.33
+7
+8
+9
+10
+9:30AM-7:00PM
+9.50
+11
+10:00AM-6:20PM
+8.33
+12
+10:05AM-5:55PM
+7.83
+13
+9:45AM-8:05PM
+10.33
+14
+15
+16
+9:10AM-6:05PM
+8.92
+17
+1:45PM-7:00PM
+5.25
+18
+10:05AM-6:00PM
+7.92
+19
+10:00AM-6:50PM
+8.83
+20
+8:45AM-6:50PM
+10.08
+21
+22
+23
+9:55AM-6:00PM
+8.08
+24
+10:00AM-5:55PM
+7.92
+25
+10:05AM-5:40PM
+7.58
+26
+27
+28
+29
+30
+31
+1st – 15th:
+78.49 hrs
+× $26/hr =
+$2040.74
+16th – End:
+64.58 hrs
+× $26/hr =
+$1679.08
+Total Month: 143.07 hrs
+Total: $3719.82
+
+</current_dom>

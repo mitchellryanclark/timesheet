@@ -1,0 +1,54 @@
+# Universal Configurable Timesheet App (v2)
+
+The goal is to move from a "Mitchell-only" app to a **Generic Platform** where all user and employer variables are configurable. Use the existing repository but refactor the code to remove all hardcoded personal strings.
+
+## 🏗️ Universal Architecture
+
+Instead of hardcoding details, the app will rely on a `user_profile` stored in `localStorage`.
+
+### ⚙️ The "User Profile" Settings
+- **User Name**: Replaces "Mitchell R Clark".
+- **Employer Name**: Replaces any hardcoded employer references.
+- **Hourly Rate**: Configurable (e.g., $26/hr).
+- **Pay Period Logic**: Configurable (e.g., 1st-15th, Weekly, Bi-weekly).
+- **Pay Date**: Choose between a **Static Day** (e.g., "the 5th") or an **Offset** (e.g., "5 days after period ends").
+- **Emails**: Configurable User and Employer email addresses.
+- **Output Format**: Choose between "Calendar Grid" or "Classic List".
+
+## 🗓️ Flexible PDF Engine
+
+Instead of one fixed layout, the new local PDF engine will offer multiple options based on common employer requirements:
+
+1. **Format A: Traditional Calendar Grid**: 7-column monthly view (best for visual review).
+2. **Format B: Classic List View**: A refined version of the current list layout (best for simple record-keeping).
+
+### 🏗️ Header & Footer
+- **Header**: Dynamically displays `User Name`, `Employer Name`, and `Period Date Range`.
+- **Footer**: Custom calculation logic based on the user's defined **Hourly Rate** and **Period Type**.
+
+## 📝 Feature Comparison (v1 vs v2)
+
+For peace of mind, all current functionality is **preserved and protected**.
+
+| Core Feature | Status in v2 | Description |
+| :--- | :--- | :--- |
+| **Google Drive Sync** | ✅ PRO Feature | Now toggleable, but fully supported. |
+| **Email Reporting** | ✅ PRO Feature | Now uses configurable recipient addresses. |
+| **Voice Commands** | ✅ Preserved | "Started at 9am" logic remains unchanged. |
+| **Snap-to-5-Mins** | ✅ Preserved | Keeps your time entries clean. |
+| **Offline Support** | ✅ Preserved | Service workers and PWA manifests stay intact. |
+| **Push Notifications** | ✅ Preserved | Reminders for missed days remain. |
+| **Calendar PDF** | 🆕 **NEW** | Visual grid view matching your reference photo. |
+| **Settings Menu** | 🆕 **NEW** | No more hardcoded names or emails. |
+| **Multiple Formats**| 🆕 **NEW** | Choice between Calendar Grid and Classic List. |
+
+## 🏗️ Proposed Changes
+
+1. **[CORE] Variable Refactor**: Scan `app.js` and replace all hardcoded strings with variables from `localStorage`.
+2. **[UI] Settings Menu**: Create a screen for users to enter their Name, Employer, Rate, and Emails.
+3. **[PDF] Local Engine**: Implement the calendar-style grid PDF using these variables.
+4. **[SYNC] Pro Module**: Maintain the current Drive Sync as an optional feature.
+
+## 🧪 Testing Plan
+- **Migration**: Ensure Mitchell's data transitions smoothly into the new Settings fields.
+- **Flexibility**: Change settings and verify the UI and PDF update instantly.

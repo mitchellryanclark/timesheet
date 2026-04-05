@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Transition plan from local/personal Apps Script architecture to a central Firebase backend. Summarizes current state (v2) and outlines the steps for Authentication, Database, and Cloud Functions to enable \"zero-setup\" Pro features for all users.",
+  "updatedAt": "2026-03-26T05:36:11.802071400Z"
+}
